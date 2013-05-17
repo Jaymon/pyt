@@ -44,24 +44,31 @@ Run more than one test:
 
 ## Things to be aware of
 
-* `pyt` uses Python's PEP standard conventions to decide what is the module and class, so, given input like this:
+* `pyt` uses Python's [PEP 8](http://www.python.org/dev/peps/pep-0008/) style conventions to decide what is the module and class, so, given input like this:
 
-    $ pyt foo.bar.Baz
+        $ pyt foo.bar.Baz.che
 
-`pyt` will consider `Baz` to be a class because it starts with a capital letter.
+    `pyt` will consider `foo.bar` to be modules, `Baz` to be a class because it starts with a capital letter, and `che` to be a method
+    since it comes after a class.
 
 * `pyt` can fail on vague input and will run the first satisfactory test it finds, so if you have:
 
-    /project
-      /user.py
-      /foo/user.py
+        /project
+          /user.py
+          /foo/user.py
 
-and you run:
+    and you run:
 
-    $ pyt user
+        $ pyt user
 
-it will run the first `user_test` it finds, even if you meant a different one, the solution is to just be more
-verbose:
+    it will run the first `user_test` it finds, even if you meant a different one, the solution is to just be more
+    verbose:
 
-    $ pyt foo.user
+        $ pyt foo.user
+
+## Installation
+
+Use `pip`:
+
+    $ pip install git+https://github.com/Jaymon/pyt#egg=pyt
 

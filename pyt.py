@@ -91,8 +91,11 @@ def get_testmodule_generator(basedir, module_name=u'', module_prefix=u''):
 
     return -- generator
     '''
-    for root, dirs, files in os.walk(basedir):
+    found = False
+    for root, dirs, files in os.walk(basedir, topdown=True):
+        dirs[:] = [d for d in dirs if d[0] != '.'] # ignore dot directories
         if module_name:
+            
             for format_str in [u'test{}', u'test_{}', u'{}test', u'{}_test']:
                 test_module_name = format_str.format(module_name)
                 module_filename = os.path.join(
@@ -101,13 +104,22 @@ def get_testmodule_generator(basedir, module_name=u'', module_prefix=u''):
                     u'{}.py'.format(test_module_name)
                 )
                 if os.path.isfile(module_filename):
+                    found = True
                     yield module_filename
 
         else:
             for f in files:
                 if re.search(ur'^(?:test\S+|\S+test)\.py$', f, re.I):
                     filepath = os.path.join(root, f)
+                    found = True
                     yield filepath
+
+    if not found:
+        raise LookupError(u"could not find a test class for basedir: {}, using module_name: {}, module_prefix: {}".format(
+            basedir,
+            module_name,
+            module_prefix
+        ))
 
 def get_test(basedir, filepath, class_name=u'', method_name=u''):
     '''
@@ -126,7 +138,7 @@ def get_test(basedir, filepath, class_name=u'', method_name=u''):
     module = module.replace(os.sep, u'.')
     if class_name:
         found = False
-        for ast_class in get_testcase_generator(filepath):
+        for ast_class in get_testcase_generator(filepath, class_name):
             found = True
             module += u'.{}'.format(ast_class.name)
             if method_name:
@@ -167,22 +179,9 @@ def find_test(test_info, basedir):
     class_name = test_info.get('class', u'')
     method_name = test_info.get('method', u'')
 
-    try:
-        if module_name:
-            for filepath in get_testmodule_generator(basedir, module_name, test_info.get('prefix', u'')):
-                test = get_test(basedir, filepath, class_name, method_name)
-                raise StopIteration()
-
-            raise LookupError(u"Could not find a test module for {}".format(test_info['module']))
-
-        else:
-            for filepath in get_testmodule_generator(basedir):
-                for ast_class in get_testcase_generator(filepath, test_class):
-                    test = get_test(basedir, filepath, ast_class.name)
-                    raise StopIteration()
-
-    except StopIteration:
-        pass
+    for filepath in get_testmodule_generator(basedir, module_name, test_info.get('prefix', u'')):
+        test = get_test(basedir, filepath, class_name, method_name)
+        break
 
     return test
 
@@ -196,6 +195,7 @@ def run_test(test, **kwargs):
     ret_code = 0
     argv = kwargs.get('argv', [])
     argv.append(test)
+    console_out("Test: {}", test)
     ret = unittest.main(module=None, exit=False, **kwargs)
     if len(ret.result.errors) or len(ret.result.failures):
         ret_code = 1
@@ -212,6 +212,10 @@ def normalize_dir(d):
     d = os.path.expanduser(d)
     d = os.path.abspath(d)
     return d
+
+def console_out(format_str, *args, **kwargs):
+    sys.stderr.write(format_str.format(*args, **kwargs)) 
+    sys.stderr.write(os.linesep)
 
 def console():
     '''
@@ -235,17 +239,23 @@ def console():
     ret_code = 0
 
     for module in args.modules:
+        found = False
         module = module.decode('utf-8')
         tests_info = find_test_info(module)
         for test_info in tests_info:
             try:
                 test = find_test(test_info, basedir)
                 if test:
+                    found = True
                     ret_code |= run_test(test, argv=test_args)
 
             except LookupError, e:
                 pass
         
+        if not found:
+            console_out("No test was found for: {}", module)
+            ret_code |= 1
+
     return ret_code
 
 if __name__ == u'__main__':
