@@ -3,9 +3,19 @@ import argparse
 import re
 import os
 import ast
+import unittest
+import sys
 
 def find_test_info(module):
-    bits = module.split('.')
+    '''
+    break up a module path to its various parts (prefix, module, class, method)
+
+    module -- string -- the module path (module.path.Class.method)
+
+    return -- list -- a list of possible interpretations of the module path (eg, foo.bar can be bar module in foo, or bar
+                                                                             method in foo)
+    '''
+    bits = module.split(u'.')
     possible = []
     module_class = u''
     module_method = u''
@@ -38,134 +48,205 @@ def find_test_info(module):
 
     return possible
 
-    # check if the second to last bit is a class (eg, we have Class.method)
+def get_testcase_generator(module_filename, class_name=u''):
+    '''
+    given a module python filename, this will yield all the test classes in the module
 
-def get_testcase_generator(module_filename, class_name=None):
+    module_filename -- string -- a full path to a .py file
+    class_name -- string -- if specified, only test classes containing class_name are returned
+
+    return -- generator
+    '''
     module_src = open(module_filename, 'rU').read()
     module_tree = ast.parse(module_src, module_filename)
     for module_node in module_tree.body:
         if isinstance(module_node, ast.ClassDef):
-            if re.search(ur'TestCase$', module_node.name):
-                if not class_name or (class_name == module_node.name):
+            if re.search(ur'Test$|TestCase$', module_node.name):
+                if not class_name or (class_name in module_node.name):
                     yield module_node
 
-def get_testmethod_generator(class_node, method_name=None):
-    for child_node in class_node:
+def get_testmethod_generator(class_node, method_name=u''):
+    '''
+    given an abstract class tree node, yield all the test methods in the class
+
+    class_node -- ast.ClassDef -- the abstract class tree
+    method_name -- string -- if specified, only yield methods containing method_name
+
+    return -- generator
+    '''
+    for child_node in class_node.body:
         if isinstance(child_node, ast.FunctionDef):
             if re.search(ur'^test_', child_node.name):
-                if not method_name or (method_name == child_node.name):
+                if not method_name or (method_name in child_node.name):
                     yield child_node
 
-def get_testmodule_generator(basedir):
-    for root, dirs, files in os.walk(basedir):
-        for f in files:
-            if re.search(ur'^(?:test\S+|\S+test)\.py$', f, re.I):
-                filepath = os.path.join(root, f)
-                yield filepath
+def get_testmodule_generator(basedir, module_name=u'', module_prefix=u''):
+    '''
+    given a basedir, yield all modules recursively found in basedir that are test modules
 
-def get_test(basedir, filepath, class_name=None):
+    basedir -- string -- the path to recursively check
+    module_name -- string -- if specified, only return modules matching module_name
+    module_prefix -- string -- if specified, only return test modules with the prefix, basically, if basedir=foo,
+        module_name=bar, and modul_prefix=che.baz then a test module would have to be in bar.che.baz to be valid
+
+    return -- generator
+    '''
+    for root, dirs, files in os.walk(basedir):
+        if module_name:
+            for format_str in [u'test{}', u'test_{}', u'{}test', u'{}_test']:
+                test_module_name = format_str.format(module_name)
+                module_filename = os.path.join(
+                    root,
+                    module_prefix,
+                    u'{}.py'.format(test_module_name)
+                )
+                if os.path.isfile(module_filename):
+                    yield module_filename
+
+        else:
+            for f in files:
+                if re.search(ur'^(?:test\S+|\S+test)\.py$', f, re.I):
+                    filepath = os.path.join(root, f)
+                    yield filepath
+
+def get_test(basedir, filepath, class_name=u'', method_name=u''):
+    '''
+    combine all the passed in arguments into a valid python module import string
+
+    basedir -- string -- the base directory to use
+    filepath -- string -- the test module full file path
+    class_name -- string -- a class name
+    method_name -- string -- a method name
+
+    return -- string -- a python.test.module.path
+    '''
     module = filepath.replace(basedir, u'')
     module = re.sub(ur'.py$', u'', module, flags=re.I)
     module = re.sub(ur'^{sep}|{sep}$'.format(sep=os.sep), u'', module)
     module = module.replace(os.sep, u'.')
     if class_name:
-        module += u'.{}'.format(class_name)
+        found = False
+        for ast_class in get_testcase_generator(filepath):
+            found = True
+            module += u'.{}'.format(ast_class.name)
+            if method_name:
+                found = False
+                for ast_method in get_testmethod_generator(ast_class, method_name):
+                    found = True
+                    module += u'.{}'.format(ast_method.name)
+
+        if not found:
+            raise LookupError(u"could not find a test for class {} or method {}: {}".format(class_name, method_name))
+
+    elif method_name:
+        found = False
+        for ast_class in get_testcase_generator(filepath):
+            for ast_method in get_testmethod_generator(ast_class, method_name):
+                found = True
+                module += u'.{}'.format(ast_class.name)
+                module += u'.{}'.format(ast_method.name)
+
+        if not found:
+            raise LookupError(u"could not find a test for method: {}".format(method_name))
+
     return module
 
 
-def find_test_module(test_info, basedir):
-    basedir = os.path.expanduser(basedir)
-    basedir = os.path.abspath(basedir)
+def find_test(test_info, basedir):
+    '''
+    given some test_info returned from find_test_info(), convert that to a valid test you could
+    pass to a unit tester
 
-    test_module = test_info.get('module', u'')
+    test_info -- dict -- test info
+    basedir -- string -- the working directory to use
 
-    test_class = test_info.get('class', u'')
-    if test_class:
-        test_class = u'{}TestCase'.format(test_class)
-
-    test_method = test_info.get('method', u'')
-    if test_method:
-        test_method = u'test_{}'.format(test_method)
+    return -- string -- see get_test()
+    '''
+    test = u''
+    module_name = test_info.get('module', u'')
+    class_name = test_info.get('class', u'')
+    method_name = test_info.get('method', u'')
 
     try:
-        if test_module:
-            for filepath in get_testmodule_generator(basedir):
-                for ast_class in get_testcase_generator(filepath, test_class):
-            for root, dirs, files in os.walk(basedir):
-                # if has module, if not, then we just need to find every test file and look for class/method
-                for format_str in [u'test{}', u'test_{}', u'{}test', u'{}_test']:
-                    test_module_name = format_str.format(test_module)
-                    test_module_filename = os.path.join(
-                        root,
-                        test_info.get('prefix', u''),
-                        u'{}.py'.format(test_module_name)
-                    )
-                    if os.path.isfile(test_module_filename):
-                        test_module = []
-
-                        root_prefix = root.replace(basedir, u'')
-                        root_prefix = re.sub(ur'^{sep}|{sep}$'.format(sep=os.sep), u'', root_prefix)
-                        root_prefix = root_prefix.replace(os.sep, u'.')
-                        test_module.append(root_prefix)
-
-                        test_module.append(test_info.get('prefix', u'').replace(os.sep, u'.'))
-                        test_module.append(test_module_name)
-                        if test_class:
-                            test_module.append(test_class)
-                            test_module.append(test_method)
-
-                        elif test_method:
-                            try:
-                                test_module_src = open(test_module_filename, 'rU').read()
-                                # we need to find the test class
-                                test_module_tree = ast.parse(test_module_src, test_module_filename)
-                                for test_module_node in test_module_tree.body:
-                                    if isinstance(test_module_node, ast.ClassDef):
-                                        if re.search(ur'TestCase$', test_module_node.name):
-                                            for test_class_node in test_module_node.body:
-                                                if test_method == test_class_node.name:
-                                                    test_module.append(test_module_node.name) # class
-                                                    test_module.append(test_method)
-                                                    raise StopIteration()
-
-                                raise LookupError(u"Could not find a TestCase with {} method".format(test_method))
-
-                            except StopIteration:
-                                pass
-
-                        test_module = u'.'.join(filter(None, test_module))
-                        raise StopIteration()
+        if module_name:
+            for filepath in get_testmodule_generator(basedir, module_name, test_info.get('prefix', u'')):
+                test = get_test(basedir, filepath, class_name, method_name)
+                raise StopIteration()
 
             raise LookupError(u"Could not find a test module for {}".format(test_info['module']))
 
         else:
             for filepath in get_testmodule_generator(basedir):
                 for ast_class in get_testcase_generator(filepath, test_class):
-                    test_module = get_test(basedir, filepath, ast_class.name)
+                    test = get_test(basedir, filepath, ast_class.name)
                     raise StopIteration()
 
     except StopIteration:
         pass
 
-        return test_module
+    return test
 
-if __name__ == u'__main__':
-    parser = argparse.ArgumentParser()
+def run_test(test, **kwargs):
+    '''
+    run the test found with find_test() with unittest
+
+    test -- string -- the found test
+    **kwargs -- dict -- all other args to pass to unittest
+    '''
+    ret_code = 0
+    argv = kwargs.get('argv', [])
+    argv.append(test)
+    ret = unittest.main(module=None, exit=False, **kwargs)
+    if len(ret.result.errors) or len(ret.result.failures):
+        ret_code = 1
+
+    return ret_code
+
+def normalize_dir(d):
+    '''
+    get rid of things like ~/ and ./ on a directory
+
+    d -- string
+    return -- string -- d, now with 100% more absolute path
+    '''
+    d = os.path.expanduser(d)
+    d = os.path.abspath(d)
+    return d
+
+def console():
+    '''
+    cli hook
+
+    return -- integer -- the exit code
+    '''
     parser = argparse.ArgumentParser(description='Easy Python Testing')
     parser.add_argument('modules', metavar='MODULE', nargs='+', help='modules you want to test')
     parser.add_argument('--basedir', dest='basedir', default=os.curdir, help='base directory, defaults to current working directory')
 
-    args = parser.parse_args()
+    args, test_args = parser.parse_known_args()
+
+    # we want to strip current working directory here and add basedir to the pythonpath
+    curdir = normalize_dir(os.curdir)
+    basedir = normalize_dir(args.basedir)
+
+    sys.path.remove(curdir)
+    sys.path.insert(0, basedir)
+    test_args.insert(0, sys.argv[0])
+    ret_code = 0
 
     for module in args.modules:
+        module = module.decode('utf-8')
         tests_info = find_test_info(module)
         for test_info in tests_info:
             try:
-                test_module = find_test_module(test_info, args.basedir)
-                if test_module:
-                    pout.v(test_module)
-                    exit()
+                test = find_test(test_info, basedir)
+                if test:
+                    ret_code |= run_test(test, argv=test_args)
+
             except LookupError, e:
-                pout.v(e)
                 pass
         
+    return ret_code
+
+if __name__ == u'__main__':
+    sys.exit(console())

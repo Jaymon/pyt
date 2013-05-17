@@ -18,7 +18,8 @@ class PytTest(unittest.TestCase):
             self.assertEqual(ret, test_out)
 
     def test_find_test_module(self):
-
-        pyt.find_test_module({}, os.curdir)
+        self.assertEqual(0, 1)
+        pass
+        #pyt.find_test_module({}, os.curdir)
 
 
