@@ -6,7 +6,7 @@
 import sys
 from setuptools import setup
 
-version = '0.1'
+version = '0.2'
 
 setup(
     name='pyt',
@@ -15,7 +15,7 @@ setup(
     author='Jay Marcyes',
     author_email='jay@marcyes.com',
     url='http://github.com/Jaymon/pyt',
-    packages=['pyt'],
+    py_modules=['pyt'],
     license="MIT",
     classifiers=[
         'Development Status :: {}'.format(version),
