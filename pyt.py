@@ -193,10 +193,14 @@ def run_test(test, **kwargs):
     **kwargs -- dict -- all other args to pass to unittest
     '''
     ret_code = 0
-    argv = kwargs.get('argv', [])
-    argv.append(test)
+
+    kwargs.setdefault('argv', [])
+    kwargs.setdefault('module', None)
+    kwargs.setdefault('exit', False)
+    kwargs['argv'].append(test)
+
     console_out("Test: {}", test)
-    ret = unittest.main(module=None, exit=False, **kwargs)
+    ret = unittest.main(**kwargs)
     if len(ret.result.errors) or len(ret.result.failures):
         ret_code = 1
 
