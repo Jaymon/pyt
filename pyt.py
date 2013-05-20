@@ -237,7 +237,11 @@ def console():
     curdir = normalize_dir(os.curdir)
     basedir = normalize_dir(args.basedir)
 
-    sys.path.remove(curdir)
+    # remove current dir paths because basedir will be the dir the code should think it is executing in
+    for p in ['', curdir, os.curdir, '{}{}'.format(os.curdir, os.sep)]:
+        if p in sys.path:
+            sys.path.remove(p)
+
     sys.path.insert(0, basedir)
     test_args.insert(0, sys.argv[0])
     ret_code = 0
