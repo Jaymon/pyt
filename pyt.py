@@ -8,6 +8,30 @@ import sys
 
 debug = False
 
+class Test(object):
+    '''
+    an instance is created and returned in get_test() and holds all the found test info needed to run the test
+    '''
+    def module(self):
+        '''
+        just the module part of a test
+        '''
+        return getattr(self, 'module_name', u'')
+
+    def specific(self):
+        '''
+        the class.method part of a test
+        '''
+        bits = (getattr(self, 'class_name', u''), getattr(self, 'method_name', u''))
+        return u'.'.join(filter(None, bits))
+        
+    def full(self):
+        '''
+        the full test: module.class.method
+        '''
+        bits = (self.module(), self.specific())
+        return u'.'.join(filter(None, bits))
+
 def find_test_info(module):
     '''
     break up a module path to its various parts (prefix, module, class, method)
@@ -136,22 +160,25 @@ def get_test(basedir, filepath, class_name=u'', method_name=u''):
     class_name -- string -- a class name
     method_name -- string -- a method name
 
-    return -- string -- a python.test.module.path
+    return -- Test() -- a Test instance with all the needed info to run the test
     '''
-    module = filepath.replace(basedir, u'')
-    module = re.sub(ur'.py$', u'', module, flags=re.I)
-    module = re.sub(ur'^{sep}|{sep}$'.format(sep=os.sep), u'', module)
-    module = module.replace(os.sep, u'.')
+    test = Test()
+    module_name = filepath.replace(basedir, u'')
+    module_name = re.sub(ur'.py$', u'', module_name, flags=re.I)
+    module_name = re.sub(ur'^{sep}|{sep}$'.format(sep=os.sep), u'', module_name)
+    module_name = module_name.replace(os.sep, u'.')
+    test.module_name = module_name
+
     if class_name:
         found = False
         for ast_class in get_testcase_generator(filepath, class_name):
             found = True
-            module += u'.{}'.format(ast_class.name)
+            test.class_name = ast_class.name
             if method_name:
                 found = False
                 for ast_method in get_testmethod_generator(ast_class, method_name):
                     found = True
-                    module += u'.{}'.format(ast_method.name)
+                    test.method_name = ast_method.name
 
         if not found:
             raise LookupError(u"could not find a test for class {} or method {}: {}".format(class_name, method_name))
@@ -161,14 +188,13 @@ def get_test(basedir, filepath, class_name=u'', method_name=u''):
         for ast_class in get_testcase_generator(filepath):
             for ast_method in get_testmethod_generator(ast_class, method_name):
                 found = True
-                module += u'.{}'.format(ast_class.name)
-                module += u'.{}'.format(ast_method.name)
+                test.class_name = ast_class.name
+                test.method_name = ast_method.name
 
         if not found:
             raise LookupError(u"could not find a test for method: {}".format(method_name))
 
-    return module
-
+    return test
 
 def find_test(test_info, basedir):
     '''
@@ -178,16 +204,20 @@ def find_test(test_info, basedir):
     test_info -- dict -- test info
     basedir -- string -- the working directory to use
 
-    return -- string -- see get_test()
+    return -- Test() -- see get_test()
     '''
-    test = u''
+    test = None
     module_name = test_info.get('module', u'')
     class_name = test_info.get('class', u'')
     method_name = test_info.get('method', u'')
+    module_prefix = test_info.get('prefix', u'')
 
-    for filepath in get_testmodule_generator(basedir, module_name, test_info.get('prefix', u'')):
-        test = get_test(basedir, filepath, class_name, method_name)
-        break
+    for filepath in get_testmodule_generator(basedir, module_name, module_prefix):
+        try:
+            test = get_test(basedir, filepath, class_name, method_name)
+            break
+        except LookupError:
+            test = None
 
     return test
 
@@ -195,15 +225,18 @@ def run_test(test, **kwargs):
     '''
     run the test found with find_test() with unittest
 
-    test -- string -- the found test
+    test -- Test -- the found test
     **kwargs -- dict -- all other args to pass to unittest
     '''
     ret_code = 0
 
     kwargs.setdefault('argv', [])
-    kwargs.setdefault('module', None)
+    kwargs.setdefault('module', test.module())
     kwargs.setdefault('exit', False)
-    kwargs['argv'].append(test)
+
+    specific = test.specific()
+    if specific:
+        kwargs['argv'].append(specific)
 
     console_out("Test: {}", test)
     ret = unittest.main(**kwargs)
@@ -285,3 +318,4 @@ def console():
 
 if __name__ == u'__main__':
     sys.exit(console())
+
