@@ -6,6 +6,8 @@ import ast
 import unittest
 import sys
 
+debug = False
+
 def find_test_info(module):
     '''
     break up a module path to its various parts (prefix, module, class, method)
@@ -63,6 +65,7 @@ def get_testcase_generator(module_filename, class_name=u''):
         if isinstance(module_node, ast.ClassDef):
             if re.search(ur'Test$|TestCase$', module_node.name):
                 if not class_name or (class_name in module_node.name):
+                    console_debug('class: {}', module_node.name)
                     yield module_node
 
 def get_testmethod_generator(class_node, method_name=u''):
@@ -78,6 +81,7 @@ def get_testmethod_generator(class_node, method_name=u''):
         if isinstance(child_node, ast.FunctionDef):
             if re.search(ur'^test_', child_node.name):
                 if not method_name or (method_name in child_node.name):
+                    console_debug('method: {}', child_node.name)
                     yield child_node
 
 def get_testmodule_generator(basedir, module_name=u'', module_prefix=u''):
@@ -105,6 +109,7 @@ def get_testmodule_generator(basedir, module_name=u'', module_prefix=u''):
                 )
                 if os.path.isfile(module_filename):
                     found = True
+                    console_debug('module: {}', module_filename)
                     yield module_filename
 
         else:
@@ -112,6 +117,7 @@ def get_testmodule_generator(basedir, module_name=u'', module_prefix=u''):
                 if re.search(ur'^(?:test\S+|\S+test)\.py$', f, re.I):
                     filepath = os.path.join(root, f)
                     found = True
+                    console_debug('module: {}', filepath)
                     yield filepath
 
     if not found:
@@ -204,6 +210,7 @@ def run_test(test, **kwargs):
     if len(ret.result.errors) or len(ret.result.failures):
         ret_code = 1
 
+    console_debug('Test returned: {}', ret_code)
     return ret_code
 
 def normalize_dir(d):
@@ -221,6 +228,10 @@ def console_out(format_str, *args, **kwargs):
     sys.stderr.write(format_str.format(*args, **kwargs)) 
     sys.stderr.write(os.linesep)
 
+def console_debug(*args, **kwargs):
+    if debug:
+        console_out(*args, **kwargs)
+
 def console():
     '''
     cli hook
@@ -230,8 +241,12 @@ def console():
     parser = argparse.ArgumentParser(description='Easy Python Testing')
     parser.add_argument('modules', metavar='MODULE', nargs='+', help='modules you want to test')
     parser.add_argument('--basedir', dest='basedir', default=os.curdir, help='base directory, defaults to current working directory')
+    parser.add_argument('--debug', dest='debug', action='store_true', help='print debugging info')
 
     args, test_args = parser.parse_known_args()
+
+    global debug
+    debug = args.debug
 
     # we want to strip current working directory here and add basedir to the pythonpath
     curdir = normalize_dir(os.curdir)
@@ -245,6 +260,8 @@ def console():
     sys.path.insert(0, basedir)
     test_args.insert(0, sys.argv[0])
     ret_code = 0
+
+    console_debug('basedir: {}', basedir)
 
     for module in args.modules:
         found = False
