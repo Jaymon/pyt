@@ -6,6 +6,8 @@ import ast
 import unittest
 import sys
 
+__version__ = '0.4'
+
 debug = False
 
 class Test(object):
@@ -31,6 +33,9 @@ class Test(object):
         '''
         bits = (self.module(), self.specific())
         return u'.'.join(filter(None, bits))
+
+    def __str__(self):
+        return self.full().encode('utf-8')
 
 def find_test_info(module):
     '''
@@ -83,11 +88,12 @@ def get_testcase_generator(module_filename, class_name=u''):
 
     return -- generator
     '''
+    regex = re.compile(ur'Test$|TestCase$')
     module_src = open(module_filename, 'rU').read()
     module_tree = ast.parse(module_src, module_filename)
     for module_node in module_tree.body:
         if isinstance(module_node, ast.ClassDef):
-            if re.search(ur'Test$|TestCase$', module_node.name):
+            if regex.search(module_node.name):
                 if not class_name or (class_name in module_node.name):
                     console_debug('class: {}', module_node.name)
                     yield module_node
@@ -101,9 +107,10 @@ def get_testmethod_generator(class_node, method_name=u''):
 
     return -- generator
     '''
+    regex = re.compile(ur'^test_')
     for child_node in class_node.body:
         if isinstance(child_node, ast.FunctionDef):
-            if re.search(ur'^test_', child_node.name):
+            if regex.search(child_node.name):
                 if not method_name or (method_name in child_node.name):
                     console_debug('method: {}', child_node.name)
                     yield child_node
@@ -123,22 +130,34 @@ def get_testmodule_generator(basedir, module_name=u'', module_prefix=u''):
     for root, dirs, files in os.walk(basedir, topdown=True):
         dirs[:] = [d for d in dirs if d[0] != '.'] # ignore dot directories
         if module_name:
-            
-            for format_str in [u'test{}', u'test_{}', u'{}test', u'{}_test']:
-                test_module_name = format_str.format(module_name)
-                module_filename = os.path.join(
-                    root,
-                    module_prefix,
-                    u'{}.py'.format(test_module_name)
-                )
+
+            if 'test' in module_name and not module_name == u'test':
+                # we want to be transparent here with python -m unittest, so if the
+                # person is passing in module_test.test_method, we want that to work
+                # the same as module.method
                 if os.path.isfile(module_filename):
                     found = True
                     console_debug('module: {}', module_filename)
                     yield module_filename
 
+            else:
+                # we have a normal module name, so try all the test variations
+                for format_str in [u'test{}', u'test_{}', u'{}test', u'{}_test']:
+                    test_module_name = format_str.format(module_name)
+                    module_filename = os.path.join(
+                        root,
+                        module_prefix,
+                        u'{}.py'.format(test_module_name)
+                    )
+                    if os.path.isfile(module_filename):
+                        found = True
+                        console_debug('module: {}', module_filename)
+                        yield module_filename
+
         else:
+            regex = re.compile(ur'^(?:test\S+|\S+test)\.py$', re.I)
             for f in files:
-                if re.search(ur'^(?:test\S+|\S+test)\.py$', f, re.I):
+                if regex.search(f):
                     filepath = os.path.join(root, f)
                     found = True
                     console_debug('module: {}', filepath)
@@ -181,7 +200,7 @@ def get_test(basedir, filepath, class_name=u'', method_name=u''):
                     test.method_name = ast_method.name
 
         if not found:
-            raise LookupError(u"could not find a test for class {} or method {}: {}".format(class_name, method_name))
+            raise LookupError(u"could not find a test for class {} or method {}".format(class_name, method_name))
 
     elif method_name:
         found = False
@@ -275,6 +294,7 @@ def console():
     parser.add_argument('modules', metavar='MODULE', nargs='+', help='modules you want to test')
     parser.add_argument('--basedir', dest='basedir', default=os.curdir, help='base directory, defaults to current working directory')
     parser.add_argument('--debug', dest='debug', action='store_true', help='print debugging info')
+    parser.add_argument("-v", "--version", action='version', version="%(prog)s {}".format(__version__))
 
     args, test_args = parser.parse_known_args()
 
