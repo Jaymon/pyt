@@ -135,6 +135,11 @@ def get_testmodule_generator(basedir, module_name=u'', module_prefix=u''):
                 # we want to be transparent here with python -m unittest, so if the
                 # person is passing in module_test.test_method, we want that to work
                 # the same as module.method
+                module_filename = os.path.join(
+                    root,
+                    module_prefix,
+                    u'{}.py'.format(module_name)
+                )
                 if os.path.isfile(module_filename):
                     found = True
                     console_debug('module: {}', module_filename)
