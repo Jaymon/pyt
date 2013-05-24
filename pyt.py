@@ -115,6 +115,34 @@ def get_testmethod_generator(class_node, method_name=u''):
                     console_debug('method: {}', child_node.name)
                     yield child_node
 
+def normalize_testmodule_filename(root, module_name, module_prefix=u''):
+    '''
+    given a module and a prefix, generate all the filenames that the test module for 
+    module can be
+
+    root -- string -- root/module_prefix/module_name
+    module_name -- string
+    module_prefix -- string
+    return -- generator -- the full filepaths of the possible module
+    '''
+    basename_fmts = []
+    if u'test' in module_name and not module_name == u'test':
+        # we want to be transparent here with python -m unittest, so if the
+        # person is passing in module_test.test_method, we want that to work
+        # the same as module.method
+        basename_fmts = [u'{}']
+    else:
+        basename_fmts = [u'test{}', u'test_{}', u'{}test', u'{}_test']
+
+    for basename_fmt in basename_fmts:
+        module_basename = basename_fmt.format(module_name)
+        module_filename = os.path.join(
+            root,
+            module_prefix,
+            u'{}.py'.format(module_basename)
+        )
+        yield module_filename
+
 def get_testmodule_generator(basedir, module_name=u'', module_prefix=u''):
     '''
     given a basedir, yield all modules recursively found in basedir that are test modules
@@ -127,40 +155,17 @@ def get_testmodule_generator(basedir, module_name=u'', module_prefix=u''):
     return -- generator
     '''
     found = False
+    regex = re.compile(ur'^(?:test\S+|\S+test)\.py$', re.I)
     for root, dirs, files in os.walk(basedir, topdown=True):
         dirs[:] = [d for d in dirs if d[0] != '.'] # ignore dot directories
         if module_name:
-
-            if 'test' in module_name and not module_name == u'test':
-                # we want to be transparent here with python -m unittest, so if the
-                # person is passing in module_test.test_method, we want that to work
-                # the same as module.method
-                module_filename = os.path.join(
-                    root,
-                    module_prefix,
-                    u'{}.py'.format(module_name)
-                )
+            for module_filename in normalize_testmodule_filename(root, module_name, module_prefix):
                 if os.path.isfile(module_filename):
                     found = True
                     console_debug('module: {}', module_filename)
                     yield module_filename
 
-            else:
-                # we have a normal module name, so try all the test variations
-                for format_str in [u'test{}', u'test_{}', u'{}test', u'{}_test']:
-                    test_module_name = format_str.format(module_name)
-                    module_filename = os.path.join(
-                        root,
-                        module_prefix,
-                        u'{}.py'.format(test_module_name)
-                    )
-                    if os.path.isfile(module_filename):
-                        found = True
-                        console_debug('module: {}', module_filename)
-                        yield module_filename
-
         else:
-            regex = re.compile(ur'^(?:test\S+|\S+test)\.py$', re.I)
             for f in files:
                 if regex.search(f):
                     filepath = os.path.join(root, f)
@@ -169,7 +174,7 @@ def get_testmodule_generator(basedir, module_name=u'', module_prefix=u''):
                     yield filepath
 
     if not found:
-        raise LookupError(u"could not find a test class for basedir: {}, using module_name: {}, module_prefix: {}".format(
+        raise LookupError(u'No test module for basedir: "{}", module_name: "{}", module_prefix: "{}"'.format(
             basedir,
             module_name,
             module_prefix
