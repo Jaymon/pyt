@@ -6,7 +6,7 @@ import ast
 import unittest
 import sys
 
-__version__ = '0.4'
+__version__ = '0.4.1'
 
 debug = False
 
@@ -111,7 +111,7 @@ def get_testmethod_generator(class_node, method_name=u''):
     for child_node in class_node.body:
         if isinstance(child_node, ast.FunctionDef):
             if regex.search(child_node.name):
-                if not method_name or (method_name in child_node.name):
+                if not method_name or re.search(ur'{}$'.format(method_name), child_node.name):
                     console_debug('method: {}', child_node.name)
                     yield child_node
 
