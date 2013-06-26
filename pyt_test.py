@@ -1,5 +1,10 @@
 import unittest
 import os
+import sys
+
+# remove any global pyt
+if 'pyt' in sys.modules:
+    del sys.modules['pyt']
 
 import pyt
 
@@ -34,6 +39,8 @@ class PytTest(unittest.TestCase):
             ('foo.Bar.baz', [{'module': 'foo', 'class': 'Bar', 'prefix': '', 'method': 'baz'}]),
             ('prefix.foo.Bar.baz', [{'module': 'foo', 'class': 'Bar', 'prefix': 'prefix', 'method': 'baz'}]),
             ('pre.fix.foo.Bar.baz', [{'module': 'foo', 'class': 'Bar', 'prefix': 'pre/fix', 'method': 'baz'}]),
+            ('Call.controller', [{'class': 'Call', 'method': 'controller', 'prefix': '', 'module': ''}]),
+            ('Call', [{'class': 'Call', 'prefix': '', 'module': ''}]),
         )
 
         for test_in, test_out in tests:
