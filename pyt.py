@@ -6,9 +6,17 @@ import ast
 import unittest
 import sys
 
-__version__ = '0.4.2'
+__version__ = '0.5'
 
 debug = False
+
+def console_out(format_str, *args, **kwargs):
+    sys.stderr.write(format_str.format(*args, **kwargs)) 
+    sys.stderr.write(os.linesep)
+
+def console_debug(*args, **kwargs):
+    if debug:
+        console_out(*args, **kwargs)
 
 class Test(object):
     '''
@@ -199,10 +207,26 @@ def get_test(basedir, filepath, class_name=u'', method_name=u''):
     return -- Test() -- a Test instance with all the needed info to run the test
     '''
     test = Test()
-    module_name = filepath.replace(basedir, u'')
-    module_name = re.sub(ur'.py$', u'', module_name, flags=re.I)
+
+    module_name = filepath.replace(basedir, u'', 1)
     module_name = re.sub(ur'^{sep}|{sep}$'.format(sep=os.sep), u'', module_name)
-    module_name = module_name.replace(os.sep, u'.')
+
+    # remove all dirs that don't have an __init__.py file (ie, they're not modules)
+    modules = module_name.split(os.sep)
+    module_count = len(modules)
+    if module_count > 1:
+        for x in xrange(module_count):
+            path_args = [basedir]
+            path_args.extend(modules[0:x + 1])
+            path_args.append(u'__init__.py')
+            module_init = os.path.join(*path_args)
+            if os.path.isfile(module_init): break
+
+        if x > 1: console_debug('Removed {} from {} because is is not a python module', os.sep.join(modules[0:x]), module_name)
+        module_name = u'.'.join(modules[x:])
+
+    # convert the remaining file path to a python module path that can be imported
+    module_name = re.sub(ur'.py$', u'', module_name, flags=re.I)
     test.module_name = module_name
 
     if class_name:
@@ -293,14 +317,6 @@ def normalize_dir(d):
     d = os.path.abspath(d)
     return d
 
-def console_out(format_str, *args, **kwargs):
-    sys.stderr.write(format_str.format(*args, **kwargs)) 
-    sys.stderr.write(os.linesep)
-
-def console_debug(*args, **kwargs):
-    if debug:
-        console_out(*args, **kwargs)
-
 def console():
     '''
     cli hook
@@ -308,7 +324,7 @@ def console():
     return -- integer -- the exit code
     '''
     parser = argparse.ArgumentParser(description='Easy Python Testing')
-    parser.add_argument('modules', metavar='MODULE', nargs='+', help='modules you want to test')
+    parser.add_argument('modules', metavar='TEST', nargs='+', help='the test(s) you want to run')
     parser.add_argument('--basedir', dest='basedir', default=os.curdir, help='base directory, defaults to current working directory')
     parser.add_argument('--debug', dest='debug', action='store_true', help='print debugging info')
     parser.add_argument("-v", "--version", action='version', version="%(prog)s {}".format(__version__))
@@ -343,6 +359,7 @@ def console():
                 if test:
                     found = True
                     ret_code |= run_test(test, argv=test_args)
+                    break # only run the first test found for each passed in arg
 
             except LookupError, e:
                 pass
