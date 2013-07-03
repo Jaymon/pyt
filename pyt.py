@@ -6,7 +6,7 @@ import ast
 import unittest
 import sys
 
-__version__ = '0.5'
+__version__ = '0.5.1'
 
 debug = False
 
@@ -240,6 +240,8 @@ def get_test(basedir, filepath, class_name=u'', method_name=u''):
                     found = True
                     test.method_name = ast_method.name
 
+            if found: break
+
         if not found:
             raise LookupError(u"could not find a test for class {} or method {}".format(class_name, method_name))
 
@@ -250,6 +252,8 @@ def get_test(basedir, filepath, class_name=u'', method_name=u''):
                 found = True
                 test.class_name = ast_class.name
                 test.method_name = ast_method.name
+
+            if found: break
 
         if not found:
             raise LookupError(u"could not find a test for method: {}".format(method_name))
