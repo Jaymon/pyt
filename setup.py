@@ -27,13 +27,14 @@ setup(
     url='http://github.com/Jaymon/pyt',
     py_modules=['pyt'],
     license="MIT",
-    classifiers=[
-        'Development Status :: {}'.format(version),
+    classifiers=[ # https://pypi.python.org/pypi?:action=list_classifiers
+        'Development Status :: 4 - Beta',
         'Environment :: Console',
         'Intended Audience :: Developers',
-        'License :: MIT',
+        'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
-        'Topic :: Utilities',
+        'Topic :: Software Development :: Testing',
+        'Programming Language :: Python :: 2.7',
     ],
     #test_suite = "test_pout",
     entry_points = {
