@@ -1,5 +1,11 @@
 # Pyt -- easy python testing for unittest tests
 
+Pyt's goal is to make writing and running Python unit tests fun and easy :)
+
+Currently, there are two main components, the `pyt` command line test runner, and the `Assert` class
+
+## pyt testrunner
+
 So here was my problem, I would work on big Python projects, and I would be adding a new python file to a module in this 
 big project, for example, my new file might be something like this:
 
@@ -26,7 +32,7 @@ and `pyt` will do the rest, it will check every test module it finds in the work
 has a Happy test case with a `test_sad` method. No more having to remember the unittest syntax, no more typing long test paths.
 Hopefully, if tests are easy to run, I'll write more of them.
 
-## More examples
+### More examples
 
 Continuing the above example
 
@@ -42,7 +48,7 @@ To run more than one test:
 
     $ pyt test1 test2 ...
 
-## Things to be aware of
+### Things to be aware of
 
 * `pyt` uses Python's [PEP 8](http://www.python.org/dev/peps/pep-0008/) style conventions to decide what is the module and class, so, given input like this:
 
@@ -69,9 +75,59 @@ To run more than one test:
 
         $ pyt foo.user
 
+## pyt Assert
+
+This is a helper class designed to make writing assert statements in your test cases a lot more fluid:
+
+    from pyt import Assert
+    
+    v = 5
+    a = Assert(v)
+
+    a == 5 # assertEqual(v, 5)
+    a != 5 # assertNotEqual(v, 5)
+    a > 5 # assertGreater(v, 5)
+    a >= 5 # assertGreaterEqual(v, 5)
+    a < 5 # assertLess(v, 5)
+    a <= 5 # assertLessEqual(v, 5)
+    +a # self.assertGreater(v, 0)
+    -a # self.assertLess(v, 0)
+    ~a # self.assertNotEqual(v, 0)
+
+    v = "foobar"
+    a = Assert(v)
+
+    "foo" in a # assertIn("foo", v)
+    "foo not in a # assertNotIn("foo", v)
+
+    a * str # assertIsInstance(v, str)
+    a ** str # assertNotIsInstance(v, str)
+
+    a / regex # assertRegexpMatches(v, re)
+    a // regex # assertNotRegexpMatches(v, re)
+
+    # assertRaises(ValueError)
+    with Assert(ValueError):
+        raise ValueError("boom")
+
+    a == False # assertFalse(v)
+    a == True # assertTrue(v)
+
+    a.len == 5 # assertEqual(len(v), 5)
+
+    #it even works on attributes of objects
+    o = SomeObject()
+    o.foo = 1
+    a = Assert(o)
+    a.foo == 1
+
 ## Installation
 
 Use `pip`:
+
+    $ pip install pyt
+
+You can also get it directly from the repo:
 
     $ pip install git+https://github.com/Jaymon/pyt#egg=pyt
 
@@ -81,3 +137,4 @@ Use `pip`:
     No test was found for: get_SQL
 
     it looks like pyt fails to find functions with capital letters in them, when I changed the function to `test_get_sql` then pyt could find it
+

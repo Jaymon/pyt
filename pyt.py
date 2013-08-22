@@ -5,10 +5,230 @@ import os
 import ast
 import unittest
 import sys
+import inspect
 
-__version__ = '0.5.3'
+__version__ = '0.6'
 
 debug = False
+
+class Assert(object):
+    """
+    Greatly simplifies asserting things by wrapping the assert methods found in unittest.TestCase
+
+    http://docs.python.org/2/library/unittest.html#unittest.TestCase
+
+    the Assert() instance must always be on the left side of the statements
+
+    This has some attributes that might name clash with an object that will be wrapped:
+
+        .val -- the passed in value an Assert instance has wrapped
+        .tc -- a unittest.TestCase instance that does the insertions
+        .len -- equivalent to len(self.val)
+
+    if that happens, bummer!
+
+    example --
+        v = 5
+        a = Assert(v)
+
+        a == 5 # assertEqual(v, 5)
+        a != 5 # assertNotEqual(v, 5)
+        a > 5 # assertGreater(v, 5)
+        a >= 5 # assertGreaterEqual(v, 5)
+        a < 5 # assertLess(v, 5)
+        a <= 5 # assertLessEqual(v, 5)
+        +a # self.assertGreater(v, 0)
+        -a # self.assertLess(v, 0)
+        ~a # self.assertNotEqual(v, 0)
+
+        v = "foobar"
+        a = Assert(v)
+
+        "foo" in a # assertIn("foo", v)
+        "foo not in a # assertNotIn("foo", v)
+
+        a * str # assertIsInstance(v, str)
+        a ** str # assertNotIsInstance(v, str)
+
+        a / regex # assertRegexpMatches(v, re)
+        a // regex # assertNotRegexpMatches(v, re)
+
+        with Assert(ValueError): # assertRaises(ValueError)
+            raise ValueError("boom")
+
+        a == False # assertFalse(v)
+        a == True # assertTrue(v)
+
+        a.len == 5 # assertEqual(len(v), 5)
+
+        #it even works on attributes of objects
+        o = SomeObject()
+        o.foo = 1
+        a = Assert(o)
+        a.foo == 1
+    """
+
+    @property
+    def len(self):
+        """adds self.len property to make up for the fact that we can't do len(self) == v"""
+        return type(self)(len(self.val))
+
+    def __init__(self, val, tc=None):
+        self.val = val
+
+        if tc:
+            self.tc = tc
+        else:
+            class AssertTestCase(unittest.TestCase):
+                def runTest(self, *args, **kwargs): pass
+            self.tc = AssertTestCase()
+
+    def __eq__(self, other):
+        """self == v -- assert val equals v"""
+        self.tc.assertEqual(self.val, other)
+        return True
+
+    def __ne__(self, other):
+        """self != v -- assert val does not equal v"""
+        self.tc.assertNotEqual(self.val, other)
+        return True
+
+    def __gt__(self, other):
+        """self > v -- assert val is greater than v"""
+        self.tc.assertGreater(self.val, other)
+        return True
+
+    def __ge__(self, other):
+        """self >= v -- assert val is greater than or equal to v"""
+        self.tc.assertGreaterEqual(self.val, other)
+        return True
+
+    def __lt__(self, other):
+        """self < v -- assert val is less than v"""
+        self.tc.assertLess(self.val, other)
+        return True
+
+    def __le__(self, other):
+        """self <= v -- assert val is less than or equal to v"""
+        self.tc.assertLessEqual(self.val, other)
+        return True
+
+    def __pos__(self):
+        """+self --  assert that val is positive"""
+        return self > 0
+
+    def __neg__(self):
+        """-self --  assert that val is negative"""
+        return self < 0
+
+    def __invert__(self):
+        """~self -- assert val is anything but 0"""
+        return self != 0
+
+    def __div__(self, regex):
+        """self / regex -- assert val matches regex"""
+        self.tc.assertRegexpMatches(self.val, regex)
+
+    def __floordiv__(self, regex):
+        """self // regex -- assert val does not match regex"""
+        self.tc.assertNotRegexpMatches(self.val, regex)
+
+    def __call__(self, exc, *args, **kwargs):
+        """
+        tests for a raised exception, sets the exception in self.exception
+
+        see -- unittest.TestCase.assertRaises
+        """
+        with self.tc.assertRaises(exc) as cm:
+            self.val(*args, **kwargs)
+
+        self.exception = cm.exception
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception_val, exception_trace):
+        """
+        tests for a raised exception using the with context, sets the exception in self.exception
+
+        see -- unittest.TestCase.assertRaises
+        """
+        self.tc.assertIsInstance(exception_val, self.val)
+        self.exception = exception_val
+        return True
+
+    def __mul__(self, types):
+        """self * type -- assert val is an instance of type"""
+        self.tc.assertIsInstance(self.val, types)
+
+    def __pow__(self, types):
+        """self ** type -- assert val is an not an instance of type"""
+        self.tc.assertNotIsInstance(self.val, types)
+    def __getattr__(self, name):
+        """
+        this is useful to make sure you can check attributes of a wrapped object
+
+        example --
+            f = Foo()
+            f.bar = 3
+            a = pyt.Assert(f)
+            a.bar == 4 # raises AssertionError
+        """
+        return type(self)(getattr(self.val, name))
+
+    def __getitem__(self, key):
+        """wrapper around val[key] access, it will raise appropriate errors if val type is wrong"""
+        return type(self)(self.val[key])
+
+    def __contains__(self, item, *args, **kwargs):
+        line = self.__get_call_str().strip()
+        if re.search('not\s+in', line, re.I):
+            self.tc.assertNotIn(item, self.val)
+        else:
+            self.tc.assertIn(item, self.val)
+
+        return True
+
+#    def __len__(self):
+#        class AssertInt(int):
+#            def __eq__(iself, other):
+#                self.tc.assertEqual(int(iself), other)
+#            def __ne__(iself, other):
+#                self.tc.assertNotEqual(int(iself), other)
+#            def __gt__(iself, other):
+#                self.tc.assertGreater(int(iself), other)
+#            def __ge__(iself, other):
+#                self.tc.assertGreaterEqual(int(iself), other)
+#            def __lt__(iself, other):
+#                self.tc.assertLess(int(iself), other)
+#            def __le__(iself, other):
+#                self.tc.assertLessEqual(int(iself), other)
+#            def __int__(self):
+#                pout.h()
+#                return iself
+#
+#        #i = AssertInt(5)
+#        # http://stackoverflow.com/questions/972/adding-a-method-to-an-existing-object
+##        i = len(self.val)
+##        def eq(iself, other):
+##            self.tc.assertEqual(int(iself), other)
+##        import types
+##        setattr(i, '__eq__', types.MethodType(eq, i))
+##        #i.__dict__['__cmp__'] = types.MethodType(eq, i)
+##        return i
+#        return AssertInt(len(self.val))
+#        #return type(self)(len(self.val))
+#
+##    def __int__(self):
+##        return 5
+#
+    def __get_call_str(self, offset=2):
+        """gets the code of the method call that led to the method being called"""
+        # NOTE -- this might not work in non CPython code
+        frame = inspect.currentframe()
+        frames = inspect.getouterframes(frame)
+        call_str = os.linesep.join(frames[offset][4])
+        return call_str
 
 def console_out(format_str, *args, **kwargs):
     sys.stderr.write(format_str.format(*args, **kwargs)) 

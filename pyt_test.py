@@ -4,6 +4,7 @@ import sys
 
 # remove any global pyt
 if 'pyt' in sys.modules:
+    sys.modules['__pyt_old'] = sys.modules['pyt']
     del sys.modules['pyt']
 
 import pyt
@@ -60,6 +61,134 @@ def setUpModule():
 
     pyt.os.walk = lambda *a, **kw: iter(file_structure)
     pyt.os.path.isfile = lambda f: (f in all_files)
+
+class AssertTest(unittest.TestCase):
+    def test_assertEqual(self):
+        a = pyt.Assert(5)
+        with self.assertRaises(Exception):
+            a == 4
+
+        with self.assertRaises(Exception):
+            a == "5"
+
+        a == 5
+
+    def test_assertNotEqual(self):
+        a = pyt.Assert(5)
+        a != 4
+        a != "5"
+
+        with self.assertRaises(Exception):
+            a != 5
+
+    def test_greater_zero(self):
+        a = pyt.Assert(5)
+        +a
+
+        a = pyt.Assert(0)
+        with self.assertRaises(Exception):
+            +a
+
+    def test_RegexpMatches(self):
+        a = pyt.Assert("foo bar")
+        a / "^f+o+"
+        with self.assertRaises(Exception):
+            a / "^[fr]+o{3}"
+
+    def test_NotRegexpMatches(self):
+        a = pyt.Assert("foo bar")
+        a // "^[fr]+o{3}"
+        with self.assertRaises(Exception):
+            a // "^f+o+"
+
+    def test_assertRaises(self):
+        def boom(*args, **kwargs):
+            raise ValueError('checking')
+
+        a = pyt.Assert(boom)
+        a(ValueError)
+        self.assertIsInstance(a.exception, ValueError)
+
+    def test_with_assertRaises(self):
+        a = pyt.Assert(ValueError)
+        with a:
+            raise ValueError('checking')
+
+        self.assertIsInstance(a.exception, ValueError)
+
+    def test_assertIsInstance(self):
+        a = pyt.Assert(1)
+        a * int
+        with self.assertRaises(Exception):
+            a * str
+
+    def test_getattr(self):
+        class Che(object): pass
+        o = Che()
+        o.foo = 1
+        o.bar = "this is a string"
+
+        a = pyt.Assert(o)
+        a.foo == 1
+        with self.assertRaises(AssertionError) as cm:
+            a.foo == 2
+
+        a.bar * str
+
+    def test_getitem(self):
+        d = {'foo': 1}
+        a = pyt.Assert(d)
+
+        a['foo'] == 1
+        with self.assertRaises(AssertionError) as cm:
+            a['foo'] == 2
+
+        with self.assertRaises(KeyError) as cm:
+            a['bar']
+
+        a = pyt.Assert(1)
+        with self.assertRaises(TypeError) as cm:
+            a['bar']
+
+    def test_in(self):
+        l = range(5)
+        a = pyt.Assert(l)
+        3 in a
+        with self.assertRaises(AssertionError) as cm:
+            3 not in a
+
+        with self.assertRaises(AssertionError) as cm:
+            20 in a
+
+    def test_bool(self):
+        a = pyt.Assert(1)
+        a == True
+        with self.assertRaises(AssertionError) as cm:
+            a == False
+
+        a = pyt.Assert(0)
+        a == False
+        with self.assertRaises(AssertionError) as cm:
+            a == True
+
+    def test_len(self):
+        l = range(5)
+        a = pyt.Assert(l)
+
+        with self.assertRaises(AssertionError) as cm:
+            a.len == 8
+
+        a.len == 5
+        a.len < 20
+        a.len > 1
+        a.len <= 20
+        a.len >= 1
+
+        with self.assertRaises(AssertionError) as cm:
+            a.len >= 8
+
+        with self.assertRaises(AssertionError) as cm:
+            a.len <= 1
 
 class PytTest(unittest.TestCase):
     def test_find_test_info(self):
