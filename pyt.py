@@ -4,10 +4,11 @@ import re
 import os
 import ast
 import unittest
+from unittest import TestCase # to allow from pyt import TestCase, Assert
 import sys
 import inspect
 
-__version__ = '0.6'
+__version__ = '0.6.1'
 
 debug = False
 
@@ -22,7 +23,7 @@ class Assert(object):
     This has some attributes that might name clash with an object that will be wrapped:
 
         .val -- the passed in value an Assert instance has wrapped
-        .tc -- a unittest.TestCase instance that does the insertions
+        .tc -- a unittest.TestCase instance that does the assertions
         .len -- equivalent to len(self.val)
 
     if that happens, bummer!
@@ -47,17 +48,22 @@ class Assert(object):
         "foo" in a # assertIn("foo", v)
         "foo not in a # assertNotIn("foo", v)
 
-        a * str # assertIsInstance(v, str)
-        a ** str # assertNotIsInstance(v, str)
+        a % str # assertIsInstance(v, str)
+        a % (str, unicode) # to use multiple, put them in a tuple
+        a ^ str # assertNotIsInstance(v, str)
 
         a / regex # assertRegexpMatches(v, re)
         a // regex # assertNotRegexpMatches(v, re)
 
-        with Assert(ValueError): # assertRaises(ValueError)
+        # assertRaises(ValueError)
+        with Assert(ValueError): 
             raise ValueError("boom")
 
         a == False # assertFalse(v)
         a == True # assertTrue(v)
+
+        a * 'foo', 'bar' # assert foo and bar are keys/attributes in v
+        a ** {...} # assert v has all keys and values in dict
 
         a.len == 5 # assertEqual(len(v), 5)
 
@@ -79,7 +85,7 @@ class Assert(object):
         if tc:
             self.tc = tc
         else:
-            class AssertTestCase(unittest.TestCase):
+            class AssertTestCase(TestCase):
                 def runTest(self, *args, **kwargs): pass
             self.tc = AssertTestCase()
 
@@ -157,13 +163,40 @@ class Assert(object):
         self.exception = exception_val
         return True
 
-    def __mul__(self, types):
-        """self * type -- assert val is an instance of type"""
+    def __mod__(self, types):
+        """self % type -- assert val is an instance of type"""
         self.tc.assertIsInstance(self.val, types)
 
-    def __pow__(self, types):
-        """self ** type -- assert val is an not an instance of type"""
+    def __xor__(self, types):
+        """self ^ type -- assert val is an not an instance of type"""
         self.tc.assertNotIsInstance(self.val, types)
+
+    def __mul__(self, keys):
+        """self * ('key1', 'key2', ...) -- assert all keys are in val"""
+        if not hasattr(keys, '__iter__'):
+            keys = [keys]
+
+        if hasattr(self.val, '__contains__'):
+            for k in keys:
+                self.tc.assertIn(k, self.val)
+
+        else:
+            for k in keys:
+                self.tc.assertTrue(hasattr(self.val, k))
+
+    def __pow__(self, keys):
+        """self ** {'key1': val1, 'key2': val2, ...} -- assert all keys and values are in val"""
+
+        if hasattr(self.val, '__contains__'):
+            for k, v in keys.iteritems():
+                self.tc.assertIn(k, self.val)
+                self.tc.assertEqual(self.val[k], v)
+
+        else:
+            for k, v in keys.iteritems():
+                self.tc.assertTrue(hasattr(self.val, k))
+                self.tc.assertEqual(getattr(self.val, k), v)
+
     def __getattr__(self, name):
         """
         this is useful to make sure you can check attributes of a wrapped object

@@ -65,10 +65,10 @@ def setUpModule():
 class AssertTest(unittest.TestCase):
     def test_assertEqual(self):
         a = pyt.Assert(5)
-        with self.assertRaises(Exception):
+        with self.assertRaises(AssertionError):
             a == 4
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(AssertionError):
             a == "5"
 
         a == 5
@@ -78,27 +78,45 @@ class AssertTest(unittest.TestCase):
         a != 4
         a != "5"
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(AssertionError):
             a != 5
+
+    def test_greater_less_equal(self):
+        a = pyt.Assert(5)
+        a <= 20
+        a < 20
+        with self.assertRaises(AssertionError):
+            a < 1
+
+        with self.assertRaises(AssertionError):
+            a <= 1
+
+        a >= 1
+        a > 1
+        with self.assertRaises(AssertionError):
+            a > 20
+
+        with self.assertRaises(AssertionError):
+            a >= 20
 
     def test_greater_zero(self):
         a = pyt.Assert(5)
         +a
 
         a = pyt.Assert(0)
-        with self.assertRaises(Exception):
+        with self.assertRaises(AssertionError):
             +a
 
     def test_RegexpMatches(self):
         a = pyt.Assert("foo bar")
         a / "^f+o+"
-        with self.assertRaises(Exception):
+        with self.assertRaises(AssertionError):
             a / "^[fr]+o{3}"
 
     def test_NotRegexpMatches(self):
         a = pyt.Assert("foo bar")
         a // "^[fr]+o{3}"
-        with self.assertRaises(Exception):
+        with self.assertRaises(AssertionError):
             a // "^f+o+"
 
     def test_assertRaises(self):
@@ -118,9 +136,57 @@ class AssertTest(unittest.TestCase):
 
     def test_assertIsInstance(self):
         a = pyt.Assert(1)
-        a * int
-        with self.assertRaises(Exception):
-            a * str
+        a % int
+        with self.assertRaises(AssertionError):
+            a % str
+
+        a = pyt.Assert(range(5))
+        a % (list, tuple)
+
+    def test_keys_in(self):
+        a = pyt.Assert(range(5))
+        a * (1, 2, 3)
+        a *  1
+        with self.assertRaises(AssertionError):
+            a * (1, 5, 6)
+
+        a = pyt.Assert({'foo': 1, 'bar': 2})
+        a * ('foo', 'bar')
+        a * 'foo'
+        with self.assertRaises(AssertionError):
+            a * 'che'
+
+        class Foo(object): pass
+        f = Foo()
+        f.foo = 1
+        f.bar = 2
+        a = pyt.Assert(f)
+        a * ('foo', 'bar')
+        a * 'foo'
+        with self.assertRaises(AssertionError):
+            a * 'che'
+
+    def test_keys_vals_in(self):
+        d = {'foo': 1, 'bar': 2}
+        a = pyt.Assert(d)
+        a ** d
+        with self.assertRaises(AssertionError):
+            a ** {'che': 3}
+
+        class Foo(object): pass
+        f = Foo()
+        f.foo = 1
+        f.bar = 2
+        a = pyt.Assert(f)
+        a ** d
+        with self.assertRaises(AssertionError):
+            a ** {'che': 3}
+
+    def test_assertNotIsInstance(self):
+        a = pyt.Assert(1)
+        a ^ str
+        with self.assertRaises(AssertionError):
+            a ^ int
 
     def test_getattr(self):
         class Che(object): pass
@@ -133,7 +199,9 @@ class AssertTest(unittest.TestCase):
         with self.assertRaises(AssertionError) as cm:
             a.foo == 2
 
-        a.bar * str
+        a.bar == "this is a string"
+        with self.assertRaises(AssertionError) as cm:
+            a.bar == "this is not a string"
 
     def test_getitem(self):
         d = {'foo': 1}

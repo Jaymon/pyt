@@ -100,18 +100,22 @@ This is a helper class designed to make writing assert statements in your test c
     "foo" in a # assertIn("foo", v)
     "foo not in a # assertNotIn("foo", v)
 
-    a * str # assertIsInstance(v, str)
-    a ** str # assertNotIsInstance(v, str)
+    a % str # assertIsInstance(v, str)
+    a % (str, unicode) # to use multiple, put them in a tuple
+    a ^ str # assertNotIsInstance(v, str)
 
     a / regex # assertRegexpMatches(v, re)
     a // regex # assertNotRegexpMatches(v, re)
 
     # assertRaises(ValueError)
-    with Assert(ValueError):
+    with Assert(ValueError): 
         raise ValueError("boom")
 
     a == False # assertFalse(v)
     a == True # assertTrue(v)
+
+    a * 'foo', 'bar' # assert foo and bar are keys/attributes in v
+    a ** {...} # assert v has all keys and values in dict
 
     a.len == 5 # assertEqual(len(v), 5)
 
@@ -130,4 +134,22 @@ Use `pip`:
 You can also get it directly from the repo:
 
     $ pip install git+https://github.com/Jaymon/pyt#egg=pyt
+
+## TODO
+
+#### Glob support 
+
+add support for globs, so you could do:
+
+    pyt *
+
+to run all commands. Or:
+
+    pyt mod*.Foo.bar*
+
+to run all test modules that start with `mod`, have a `Foo` class, and `test_bar*` methods
+
+#### Tests don't run in windows
+
+I used `/` in the tests, and `os.sep` in all the pyt stuff, so it runs on windows, it just doesn't pass the tests :(
 
