@@ -200,6 +200,8 @@ class PytTest(unittest.TestCase):
             ('pre.fix.foo.Bar.baz', [{'module': 'foo', 'class': 'Bar', 'prefix': 'pre/fix', 'method': 'baz'}]),
             ('Call.controller', [{'class': 'Call', 'method': 'controller', 'prefix': '', 'module': ''}]),
             ('Call', [{'class': 'Call', 'prefix': '', 'module': ''}]),
+            ('Boom.fooBar', [{'class': 'Boom', 'prefix': '', 'module': '', 'method': 'fooBar'}]),
+            ('get_SQL', [{'module': 'get_SQL', 'prefix': ''}, {'method': 'get_SQL', 'module': '', 'prefix': ''}]),
         )
 
         for test_in, test_out in tests:

@@ -131,10 +131,3 @@ You can also get it directly from the repo:
 
     $ pip install git+https://github.com/Jaymon/pyt#egg=pyt
 
-## Bugs
-
-    $ pyt get_SQL
-    No test was found for: get_SQL
-
-    it looks like pyt fails to find functions with capital letters in them, when I changed the function to `test_get_sql` then pyt could find it
-

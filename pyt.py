@@ -281,13 +281,13 @@ def find_test_info(module):
     module_prefix = u''
 
     # check if the last bit is a Class
-    if re.search(ur'[A-Z]', bits[-1]):
+    if re.search(ur'^[A-Z]', bits[-1]):
         possible.append({
             'class': bits[-1],
             'module': bits[-2] if len(bits) > 1 else u'',
             'prefix': os.sep.join(bits[0:-2])
         })
-    elif len(bits) > 1 and re.search(ur'[A-Z]', bits[-2]):
+    elif len(bits) > 1 and re.search(ur'^[A-Z]', bits[-2]):
         possible.append({
             'class': bits[-2],
             'method': bits[-1],
