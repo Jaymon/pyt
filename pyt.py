@@ -189,39 +189,6 @@ class Assert(object):
 
         return True
 
-#    def __len__(self):
-#        class AssertInt(int):
-#            def __eq__(iself, other):
-#                self.tc.assertEqual(int(iself), other)
-#            def __ne__(iself, other):
-#                self.tc.assertNotEqual(int(iself), other)
-#            def __gt__(iself, other):
-#                self.tc.assertGreater(int(iself), other)
-#            def __ge__(iself, other):
-#                self.tc.assertGreaterEqual(int(iself), other)
-#            def __lt__(iself, other):
-#                self.tc.assertLess(int(iself), other)
-#            def __le__(iself, other):
-#                self.tc.assertLessEqual(int(iself), other)
-#            def __int__(self):
-#                pout.h()
-#                return iself
-#
-#        #i = AssertInt(5)
-#        # http://stackoverflow.com/questions/972/adding-a-method-to-an-existing-object
-##        i = len(self.val)
-##        def eq(iself, other):
-##            self.tc.assertEqual(int(iself), other)
-##        import types
-##        setattr(i, '__eq__', types.MethodType(eq, i))
-##        #i.__dict__['__cmp__'] = types.MethodType(eq, i)
-##        return i
-#        return AssertInt(len(self.val))
-#        #return type(self)(len(self.val))
-#
-##    def __int__(self):
-##        return 5
-#
     def __get_call_str(self, offset=2):
         """gets the code of the method call that led to the method being called"""
         # NOTE -- this might not work in non CPython code
