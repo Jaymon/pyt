@@ -8,7 +8,7 @@ from unittest import TestCase # to allow from pyt import TestCase, Assert
 import sys
 import inspect
 
-__version__ = '0.6.3'
+__version__ = '0.6.4'
 
 debug = False
 
@@ -198,11 +198,7 @@ class Assert(object):
         else:
             for k, v in keys.iteritems():
                 self.tc.assertTrue(hasattr(self.val, k), "Attribute {} does not exist".format(k))
-                self.tc.assertEqual(
-                    getattr(self.val, k),
-                    v,
-                    "Attribute {} value does not match expected value".format(k)
-                )
+                self.tc.assertEqual(getattr(self.val, k), v)
 
     def __ipow__(self, keys):
         """self **= {'key1': val1, 'key2': val2, ...} -- assert only these keys and values are in val"""

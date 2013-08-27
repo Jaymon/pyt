@@ -185,6 +185,7 @@ class AssertTest(unittest.TestCase):
         a ** d
         with self.assertRaises(AssertionError):
             a ** {'che': 3}
+        a ** {'foo': 3}
 
         class Foo(object): pass
         f = Foo()
