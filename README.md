@@ -117,13 +117,17 @@ This is a helper class designed to make writing assert statements in your test c
     a * 'foo', 'bar' # assert foo and bar are keys/attributes in v
     a ** {...} # assert v has all keys and values in dict
 
+    a *= 'foo', 'bar' # assert foo and bar are the only keys in v
+    a **= {...} # assert v has only the keys and values in dict
+
     a.len == 5 # assertEqual(len(v), 5)
 
-    #it even works on attributes of objects
+    # it even works on attributes and methods of objects
     o = SomeObject()
     o.foo = 1
     a = Assert(o)
     a.foo == 1
+    a.bar() == "bar return value"
 
 ## Installation
 

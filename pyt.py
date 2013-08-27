@@ -65,13 +65,17 @@ class Assert(object):
         a * 'foo', 'bar' # assert foo and bar are keys/attributes in v
         a ** {...} # assert v has all keys and values in dict
 
+        a *= 'foo', 'bar' # assert foo and bar are the only keys in v
+        a **= {...} # assert v has only the keys and values in dict
+
         a.len == 5 # assertEqual(len(v), 5)
 
-        #it even works on attributes of objects
+        # it even works on attributes and methods of objects
         o = SomeObject()
         o.foo = 1
         a = Assert(o)
         a.foo == 1
+        a.bar() == "bar return value"
     """
 
     @property
@@ -139,16 +143,9 @@ class Assert(object):
         """self // regex -- assert val does not match regex"""
         self.tc.assertNotRegexpMatches(self.val, regex)
 
-    def __call__(self, exc, *args, **kwargs):
-        """
-        tests for a raised exception, sets the exception in self.exception
-
-        see -- unittest.TestCase.assertRaises
-        """
-        with self.tc.assertRaises(exc) as cm:
-            self.val(*args, **kwargs)
-
-        self.exception = cm.exception
+    def __call__(self, *args, **kwargs):
+        """self.method() -- wrap the value from a method call"""
+        return type(self)(self.val(*args, **kwargs))
 
     def __enter__(self):
         return self
@@ -182,7 +179,13 @@ class Assert(object):
 
         else:
             for k in keys:
-                self.tc.assertTrue(hasattr(self.val, k))
+                self.tc.assertTrue(hasattr(self.val, k), "Attribute {} does not exist".format(k))
+
+    def __imul__(self, keys):
+        """self *= ('key1', 'key2', ...) -- assert only these keys are in val"""
+        self.__mul__(keys)
+        self.tc.assertEqual(len(self.val), len(keys), "val contains unexpected values")
+        return self
 
     def __pow__(self, keys):
         """self ** {'key1': val1, 'key2': val2, ...} -- assert all keys and values are in val"""
@@ -194,8 +197,18 @@ class Assert(object):
 
         else:
             for k, v in keys.iteritems():
-                self.tc.assertTrue(hasattr(self.val, k))
-                self.tc.assertEqual(getattr(self.val, k), v)
+                self.tc.assertTrue(hasattr(self.val, k), "Attribute {} does not exist".format(k))
+                self.tc.assertEqual(
+                    getattr(self.val, k),
+                    v,
+                    "Attribute {} value does not match expected value".format(k)
+                )
+
+    def __ipow__(self, keys):
+        """self **= {'key1': val1, 'key2': val2, ...} -- assert only these keys and values are in val"""
+        self.__pow__(keys)
+        self.tc.assertEqual(len(self.val), len(keys), "val contains unexpected values")
+        return self
 
     def __getattr__(self, name):
         """

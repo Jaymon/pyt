@@ -119,13 +119,15 @@ class AssertTest(unittest.TestCase):
         with self.assertRaises(AssertionError):
             a // "^f+o+"
 
-    def test_assertRaises(self):
-        def boom(*args, **kwargs):
-            raise ValueError('checking')
-
-        a = pyt.Assert(boom)
-        a(ValueError)
-        self.assertIsInstance(a.exception, ValueError)
+# I changed this so you can only catch exceptions with the with handler, using __call__
+# will allow methods to be called from assert the same way attributes are wrapped
+#    def test_assertRaises(self):
+#        def boom(*args, **kwargs):
+#            raise ValueError('checking')
+#
+#        a = pyt.Assert(boom)
+#        a(ValueError)
+#        self.assertIsInstance(a.exception, ValueError)
 
     def test_with_assertRaises(self):
         a = pyt.Assert(ValueError)
@@ -163,8 +165,19 @@ class AssertTest(unittest.TestCase):
         a = pyt.Assert(f)
         a * ('foo', 'bar')
         a * 'foo'
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(AssertionError) as cm:
             a * 'che'
+
+    def test_keys_only_in(self):
+        a = pyt.Assert(range(5))
+        a *= (0, 1, 2, 3, 4)
+        with self.assertRaises(AssertionError):
+            a *= (0, 1, 2)
+
+        a = pyt.Assert({'foo': 1, 'bar': 2})
+        a *= ('foo', 'bar')
+        with self.assertRaises(AssertionError):
+            a *= 'foo'
 
     def test_keys_vals_in(self):
         d = {'foo': 1, 'bar': 2}
@@ -181,6 +194,13 @@ class AssertTest(unittest.TestCase):
         a ** d
         with self.assertRaises(AssertionError):
             a ** {'che': 3}
+
+    def test_keys_vals_only_in(self):
+        d = {'foo': 1, 'bar': 2}
+        a = pyt.Assert(d)
+        a **= d
+        with self.assertRaises(AssertionError):
+            a **= {'foo': 1}
 
     def test_assertNotIsInstance(self):
         a = pyt.Assert(1)
@@ -257,6 +277,15 @@ class AssertTest(unittest.TestCase):
 
         with self.assertRaises(AssertionError) as cm:
             a.len <= 1
+
+    def test_method(self):
+        class Foo(object):
+            def bar(self, val):
+                return val
+
+        f = Foo()
+        a = pyt.Assert(f)
+        a.bar(1) == 1
 
 class PytTest(unittest.TestCase):
     def test_find_test_info(self):
