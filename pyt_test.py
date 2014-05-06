@@ -1,6 +1,9 @@
 import unittest
+from unittest import TestCase
 import os
 import sys
+
+import testdata
 
 # remove any global pyt
 if 'pyt' in sys.modules:
@@ -8,6 +11,11 @@ if 'pyt' in sys.modules:
     del sys.modules['pyt']
 
 import pyt
+from pyt import tester
+from pyt import echo
+
+echo.DEBUG = True
+
 
 def setUpModule():
     """
@@ -16,6 +24,8 @@ def setUpModule():
     basically, the idea of this folder structure is that /foo will have not be a submodule (no
     __init__.py file) but lots of other folders will be modules
     """
+    # TODO -- switch over to use testdata instead of monkey patch
+    return
     file_structure = [
         # root, dirs, files
         ('/foo', ['1', '2', 'test', 'bar', 'one'], []),
@@ -61,6 +71,7 @@ def setUpModule():
 
     pyt.os.walk = lambda *a, **kw: iter(file_structure)
     pyt.os.path.isfile = lambda f: (f in all_files)
+
 
 class AssertTest(unittest.TestCase):
     def test_assertEqual(self):
@@ -288,25 +299,225 @@ class AssertTest(unittest.TestCase):
         a = pyt.Assert(f)
         a.bar(1) == 1
 
-class PytTest(unittest.TestCase):
-    def test_find_test_info(self):
+
+class TestModule(object):
+    @property
+    def test(self):
+        t = tester.Test()
+        t.module_name = self.name
+        return t
+
+    @property
+    def tci(self):
+        """return a TestCaseInfo instance for this module"""
+        tc = tester.TestCaseInfo(
+            self.cwd,
+            module_name=self.module_name, 
+            prefix=self.prefix
+        )
+        return tc
+
+    def __init__(self, *body, **kwargs):
+        if len(body) == 1: body = body[0]
+
+        self.body = body
+        if not isinstance(body, basestring):
+            self.body = "\n".join(body)
+
+        self.cwd = testdata.create_dir()
+
+        name = kwargs.get('name', '')
+        if name:
+            self.name = name
+        else:
+            self.name = "prefix{}.pmod{}_test".format(testdata.get_ascii(5), testdata.get_ascii(5))
+
+        self.module_name = self.name.rsplit('.', 1)[1]
+        self.prefix = self.name.rsplit('.', 1)[0]
+
+        self.path = testdata.create_module(
+            self.name,
+            self.body,
+            self.cwd
+        )
+
+
+
+class TestCaseInfoTest(TestCase):
+    def test_method_names(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class CheTest(TestCase):",
+            "   def test_foo(self): pass",
+            name="foo.bar_test"
+        )
+
+        tc = m.tci
+        tc.class_name = 'Che'
+        tc.method_name = 'foo'
+
+        r = list(tc.method_names())
+        self.assertEqual(1, len(r))
+
+    def test_paths(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class CheTest(TestCase):",
+            "   pass",
+            name="foo.bar.baz_test"
+        )
+
+        tc = m.tci
+
+        cs = list(tc.paths())
+        self.assertEqual(1, len(cs))
+
+        tc.prefix = 'boom.bam'
+        with self.assertRaises(LookupError):
+            cs = list(tc.paths())
+
+    def test_classes(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BaseTCase(TestCase):",
+            "   def test_foo(self):",
+            "       pass",
+            "",
+            "class BarTest(BaseTCase):",
+            "   pass"
+        )
+
+        tc = m.tci
+        cs = list(tc.classes())
+        self.assertEqual(2, len(cs))
+
+        tc.class_name = 'Bar'
+        cs = list(tc.classes())
+        self.assertEqual(1, len(cs))
+
+
+
+
+
+class TestInfoTest(TestCase):
+    def test_set_possible(self):
         tests = (
-            ('foo.bar', [{'module': 'bar', 'prefix': 'foo'}, {'method': 'bar', 'module': 'foo', 'prefix': ''}]),
-            ('foo.Bar', [{'module': 'foo', 'class': 'Bar', 'prefix': ''}]),
-            ('foo.Bar.baz', [{'module': 'foo', 'class': 'Bar', 'prefix': '', 'method': 'baz'}]),
-            ('prefix.foo.Bar.baz', [{'module': 'foo', 'class': 'Bar', 'prefix': 'prefix', 'method': 'baz'}]),
-            ('pre.fix.foo.Bar.baz', [{'module': 'foo', 'class': 'Bar', 'prefix': 'pre/fix', 'method': 'baz'}]),
-            ('Call.controller', [{'class': 'Call', 'method': 'controller', 'prefix': '', 'module': ''}]),
-            ('Call', [{'class': 'Call', 'prefix': '', 'module': ''}]),
-            ('Boom.fooBar', [{'class': 'Boom', 'prefix': '', 'module': '', 'method': 'fooBar'}]),
-            ('get_SQL', [{'module': 'get_SQL', 'prefix': ''}, {'method': 'get_SQL', 'module': '', 'prefix': ''}]),
+            ('foo.bar', [{'module_name': 'bar', 'prefix': 'foo'}, {'method_name': 'bar', 'module_name': 'foo', 'prefix': ''}]),
+            ('foo.Bar', [{'module_name': 'foo', 'class_name': 'Bar', 'prefix': ''}]),
+            ('foo.Bar.baz', [{'module_name': 'foo', 'class_name': 'Bar', 'prefix': '', 'method_name': 'baz'}]),
+            ('prefix.foo.Bar.baz', [{'module_name': 'foo', 'class_name': 'Bar', 'prefix': 'prefix', 'method_name': 'baz'}]),
+            ('pre.fix.foo.Bar.baz', [{'module_name': 'foo', 'class_name': 'Bar', 'prefix': 'pre/fix', 'method_name': 'baz'}]),
+            ('Call.controller', [{'class_name': 'Call', 'method_name': 'controller', 'prefix': '', 'module_name': ''}]),
+            ('Call', [{'class_name': 'Call', 'prefix': '', 'module_name': ''}]),
+            ('Boom.fooBar', [{'class_name': 'Boom', 'prefix': '', 'module_name': '', 'method_name': 'fooBar'}]),
+            ('get_SQL', [{'module_name': 'get_SQL', 'prefix': ''}, {'method_name': 'get_SQL', 'module_name': '', 'prefix': ''}]),
         )
 
         for test_in, test_out in tests:
-            ret = pyt.find_test_info(test_in)
-            self.assertEqual(ret, test_out)
+            ti = tester.TestInfo(test_in, '/tmp')
+            for i, to in enumerate(test_out):
+                for k, v in to.iteritems():
+                    r = getattr(ti.possible[i], k)
+                    self.assertEqual(v, r)
+
+
+class TestLoaderTest(TestCase):
+    def test_no_module(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BaseTCase(TestCase):",
+            "   def test_foo(self):",
+            "       pass",
+            "",
+            "class BarTest(BaseTCase):",
+            "   pass"
+        )
+
+        # this should call load from name(s)
+        tl = tester.TestLoader('pmod', m.cwd)
+        ret_code = tester.run_test('pmod', m.cwd)
+
+    def test_module(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BaseTCase(TestCase):",
+            "   def test_foo(self):",
+            "       pass",
+            "",
+            "class BarTest(BaseTCase):",
+            "   pass"
+        )
+
+        tl = tester.TestLoader('pmod', m.cwd)
+        pout.v(tl.module)
+
+class TesterTest(unittest.TestCase):
+    def test_run_module(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BaseTCase(TestCase):",
+            "   def test_foo(self):",
+            "       pass",
+            "",
+            "class BarTest(BaseTCase):",
+            "   pass"
+        )
+        t = m.test
+        t.module_name = 'pmod'
+
+        ret_code = tester.run_test(t, m.cwd)
+        pout.v(ret_code)
+
+
+    def test_tcase(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BaseTCase(TestCase):",
+            "   def test_foo(self):",
+            "       pass",
+            "",
+            "class BarTest(BaseTCase):",
+            "   pass"
+        )
+
+        for tc in tester.get_testcase_generator(m.path, 'Bar'):
+            m = tc.method('foo', True)
+            self.assertEqual('test_foo', m)
+
+            m = tc.method('test_foo', True)
+            self.assertEqual('test_foo', m)
+
+
+
+    def test_getting_test(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BaseTCase(TestCase):",
+            "   def test_foo(self):",
+            "       pass",
+            "",
+            "class BarTest(BaseTCase):",
+            "   pass"
+        )
+
+        pout.b()
+        search_str = '{}.Bar.foo'.format(m.name)
+        t = tester.get_test(m.cwd, m.path, 'Bar', 'foo')
+        pout.v(t)
+        pout.b()
+
 
     def test_find_test_module(self):
+        # TODO -- update to use testdata
+        return
         tests = (
             (u'five', u'2.3.five_test'),
             (u'five_test', u'2.3.five_test'),
@@ -318,6 +529,8 @@ class PytTest(unittest.TestCase):
             self.assertEqual(test.module_name, test_out)
 
     def test_get_test(self):
+        # TODO -- update to use testdata
+        return
         #pyt.debug = True
 
         basedir = "/foo"
@@ -329,7 +542,7 @@ class PytTest(unittest.TestCase):
         filepath = "/foo/2/3/five_test.py"
         test = pyt.get_test(basedir, filepath)
         self.assertEqual('2.3.five_test', str(test))
-        
+
         basedir = "/foo"
         filepath = "/bar/che/six_test.py"
         test = pyt.get_test(basedir, filepath)
@@ -339,3 +552,4 @@ class PytTest(unittest.TestCase):
         filepath = "/one/two/three/seven_test.py"
         test = pyt.get_test(basedir, filepath)
         self.assertEqual('three.seven_test', str(test))
+
