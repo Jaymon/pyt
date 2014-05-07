@@ -487,6 +487,23 @@ class TestInfoTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_relative_import(self):
+        cwd = testdata.create_dir()
+        testdata.create_modules(
+            {
+                'tests': 'from unittest import TestCase',
+                'tests.foo_test': "\n".join([
+                    'from . import TestCase',
+                    '',
+                    'class FooTest(TestCase):',
+                    '    def test_bar(self): pass'
+                ])
+            },
+            tmpdir=cwd
+        )
+
+        ret_code = tester.run_test('Foo.bar', cwd)
+
     def test_cli_2(self):
         m = TestModule(
             "from unittest import TestCase",

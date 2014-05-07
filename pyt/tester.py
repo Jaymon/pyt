@@ -8,6 +8,7 @@ from unittest import TestCase # to allow from pyt import TestCase, Assert
 import sys
 import inspect
 import imp
+import importlib
 
 from . import echo
 
@@ -112,17 +113,22 @@ class TestCaseInfo(object):
 
     def modules(self):
         """return modules that match module_name"""
-        module_name = getattr(self, 'module_name', u'TestCaseInfo_modules')
+        # this is a hack, I couldn't get imp.load_source to work right
+        sys.path.insert(0, self.basedir)
         for p in self.paths():
             # http://stackoverflow.com/questions/67631/
             try:
-                m = imp.load_source(module_name, p)
+                module_name = self.module_path(p)
+                m = importlib.import_module(module_name)
+                #m = imp.load_source(module_name, p)
                 yield m
 
             except Exception, e:
                 echo.debug("could not load module: {}", p)
                 echo.debug(e)
                 continue
+
+        sys.path.pop(0)
 
     def classes(self):
         """the partial self.class_name will be used to find actual TestCase classes"""
@@ -203,7 +209,8 @@ class TestCaseInfo(object):
 
     def module_path(self, filepath):
         # TODO -- I don't think this works or does anything useful
-        module_name = filepath.replace(self.basedir, u'', 1)
+        basedir = self.basedir
+        module_name = filepath.replace(basedir, u'', 1)
         module_name = module_name.strip('\\/')
 
         # remove all dirs that don't have an __init__.py file (ie, they're not modules)
