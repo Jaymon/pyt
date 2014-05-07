@@ -244,17 +244,20 @@ class TestLoader(unittest.TestLoader):
             echo.debug("{}. Searching for test matching: {}", i, tc)
             if tc.has_method():
                 for c, mn in tc.method_names():
-                    echo.debug('adding test method to suite: {}', mn)
+                    #echo.debug('adding test method to suite: {}', mn)
+                    echo.out('Found test: {}.{}.{}', c.__module__, c.__name__, mn)
                     ts.addTest(c(mn))
 
             elif tc.has_class():
                 for c in tc.classes():
-                    echo.debug('adding testcase to suite: {}', c.__name__)
+                    #echo.debug('adding testcase to suite: {}', c.__name__)
+                    echo.out('Found test: {}.{}', c.__module__, c.__name__)
                     ts.addTest(self.loadTestsFromTestCase(c))
 
             else:
                 for m in tc.modules():
-                    echo.debug('adding module to suite: {}', m.__name__)
+                    #echo.debug('adding module to suite: {}', m.__name__)
+                    echo.out('Found test: {}', m.__name__)
                     ts.addTest(self.loadTestsFromModule(m))
 
         return ts
