@@ -2,6 +2,7 @@ import unittest
 from unittest import TestCase
 import os
 import sys
+import subprocess
 
 import testdata
 
@@ -17,61 +18,61 @@ from pyt import echo
 echo.DEBUG = True
 
 
-def setUpModule():
-    """
-    set up the test module with a file structure to test finding different modules
-
-    basically, the idea of this folder structure is that /foo will have not be a submodule (no
-    __init__.py file) but lots of other folders will be modules
-    """
-    # TODO -- switch over to use testdata instead of monkey patch
-    return
-    file_structure = [
-        # root, dirs, files
-        ('/foo', ['1', '2', 'test', 'bar', 'one'], []),
-        ('/foo/1', [], ['__init__.py', 'one.py', 'two.PY']),
-
-        ('/foo/2', ['3'], ['__init__.py', 'three.py', 'four.py']),
-        ('/foo/2/3', [], ['__init__.py', 'five.py', 'five_test.py']),
-
-        ('/foo/test', ['1', '2'], ['__init__.py']),
-        ('/foo/test/1', [], ['__init__.py', 'one_test.py', 'testtwo.py']),
-        ('/foo/test/2', [], ['__init__.py', 'threetest.py', 'test_four.py']),
-
-        ('/foo/bar', ['che'], []),
-        ('/foo/bar/che', [], ['__init__.py', 'six_test.py']),
-
-        ('/foo/one', ['two'], []),
-        ('/foo/one/two', ['three'], []),
-        ('/foo/one/two/three', [], ['__init__.py', 'seven_test.py']),
-    ]
-
-    test_modules = [
-        '/foo/2/3/five_test.py',
-        '/foo/test/1/one_test.py',
-        '/foo/test/1/testtwo.py',
-        '/foo/test/2/threetest.py',
-        '/foo/test/2/test_four.py',
-        '/foo/bar/che/six_test.py',
-        '/foo/one/two/three/seven_test.py',
-
-    ]
-
-    all_files = list(test_modules)
-    all_files.extend([
-        '/foo/1/__init__.py',
-        '/foo/2/__init__.py',
-        '/foo/2/3/__init__.py',
-        '/foo/test/__init__.py',
-        '/foo/test/1/__init__.py',
-        '/foo/test/2/__init__.py',
-        '/foo/bar/che/__init__.py',
-        '/foo/one/two/three/__init__.py',
-    ])
-
-    pyt.os.walk = lambda *a, **kw: iter(file_structure)
-    pyt.os.path.isfile = lambda f: (f in all_files)
-
+#def setUpModule():
+#    """
+#    set up the test module with a file structure to test finding different modules
+#
+#    basically, the idea of this folder structure is that /foo will have not be a submodule (no
+#    __init__.py file) but lots of other folders will be modules
+#    """
+#    # TODO -- switch over to use testdata instead of monkey patch
+#    return
+#    file_structure = [
+#        # root, dirs, files
+#        ('/foo', ['1', '2', 'test', 'bar', 'one'], []),
+#        ('/foo/1', [], ['__init__.py', 'one.py', 'two.PY']),
+#
+#        ('/foo/2', ['3'], ['__init__.py', 'three.py', 'four.py']),
+#        ('/foo/2/3', [], ['__init__.py', 'five.py', 'five_test.py']),
+#
+#        ('/foo/test', ['1', '2'], ['__init__.py']),
+#        ('/foo/test/1', [], ['__init__.py', 'one_test.py', 'testtwo.py']),
+#        ('/foo/test/2', [], ['__init__.py', 'threetest.py', 'test_four.py']),
+#
+#        ('/foo/bar', ['che'], []),
+#        ('/foo/bar/che', [], ['__init__.py', 'six_test.py']),
+#
+#        ('/foo/one', ['two'], []),
+#        ('/foo/one/two', ['three'], []),
+#        ('/foo/one/two/three', [], ['__init__.py', 'seven_test.py']),
+#    ]
+#
+#    test_modules = [
+#        '/foo/2/3/five_test.py',
+#        '/foo/test/1/one_test.py',
+#        '/foo/test/1/testtwo.py',
+#        '/foo/test/2/threetest.py',
+#        '/foo/test/2/test_four.py',
+#        '/foo/bar/che/six_test.py',
+#        '/foo/one/two/three/seven_test.py',
+#
+#    ]
+#
+#    all_files = list(test_modules)
+#    all_files.extend([
+#        '/foo/1/__init__.py',
+#        '/foo/2/__init__.py',
+#        '/foo/2/3/__init__.py',
+#        '/foo/test/__init__.py',
+#        '/foo/test/1/__init__.py',
+#        '/foo/test/2/__init__.py',
+#        '/foo/bar/che/__init__.py',
+#        '/foo/one/two/three/__init__.py',
+#    ])
+#
+#    pyt.os.walk = lambda *a, **kw: iter(file_structure)
+#    pyt.os.path.isfile = lambda f: (f in all_files)
+#
 
 class AssertTest(unittest.TestCase):
     def test_assertEqual(self):
@@ -196,7 +197,9 @@ class AssertTest(unittest.TestCase):
         a ** d
         with self.assertRaises(AssertionError):
             a ** {'che': 3}
-        a ** {'foo': 3}
+
+        with self.assertRaises(AssertionError):
+            a ** {'foo': 3}
 
         class Foo(object): pass
         f = Foo()
@@ -300,6 +303,41 @@ class AssertTest(unittest.TestCase):
         a.bar(1) == 1
 
 
+class Client(object):
+    """makes running a captain script nice and easy for easy testing"""
+    def __init__(self, cwd):
+        self.cwd = cwd
+
+    def run(self, arg_str=''):
+        cmd = "python -m pyt --basedir={} {}".format(self.cwd, arg_str)
+
+        r = ''
+        try:
+            process = subprocess.Popen(
+                cmd,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=os.curdir
+            )
+
+            while True:
+                char = process.stdout.read(1)
+                if char == '' and process.poll() is not None:
+                    break
+                sys.stdout.write(char)
+                sys.stdout.flush()
+                r += char
+
+            if process.returncode > 0:
+                raise RuntimeError("cmd returned {} with output".format(process.returncode, r))
+
+        except subprocess.CalledProcessError, e:
+            raise RuntimeError("cmd returned {} with output: {}".format(e.returncode, e.output))
+
+        return r
+
+
 class TestModule(object):
     @property
     def test(self):
@@ -342,8 +380,29 @@ class TestModule(object):
         )
 
 
-
 class TestCaseInfoTest(TestCase):
+    def test_suite(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class CheTest(TestCase):",
+            "   def test_foo(self): pass"
+        )
+
+        tc = m.tci
+        s = tc.suite
+        self.assertTrue('test_foo' in str(s))
+
+        tc.class_name = 'Bar'
+        tc.method_name = 'foo'
+        s = tc.suite
+        self.assertFalse('test_foo' in str(s))
+
+        tc.class_name = ''
+        tc.method_name = 'foo'
+        s = tc.suite
+        self.assertTrue('test_foo' in str(s))
+
     def test_method_names(self):
         m = TestModule(
             "from unittest import TestCase",
@@ -399,9 +458,6 @@ class TestCaseInfoTest(TestCase):
         self.assertEqual(1, len(cs))
 
 
-
-
-
 class TestInfoTest(TestCase):
     def test_set_possible(self):
         tests = (
@@ -418,14 +474,75 @@ class TestInfoTest(TestCase):
 
         for test_in, test_out in tests:
             ti = tester.TestInfo(test_in, '/tmp')
+            ti.set_possible()
             for i, to in enumerate(test_out):
                 for k, v in to.iteritems():
                     r = getattr(ti.possible[i], k)
                     self.assertEqual(v, r)
 
+    def test_no_name(self):
+        ti = tester.TestInfo('', '/tmp')
+        ti.set_possible()
+        self.assertEqual(1, len(ti.possible))
+
+
+class RunTestTest(TestCase):
+    def test_cli(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BarTest(TestCase):",
+            "    def test_foo(self):",
+            "        pass",
+        )
+
+        s = Client(m.cwd)
+        r = s.run('pmod --debug')
+
+        with self.assertRaises(RuntimeError):
+            r = s.run('blah.blarg.blorg --debug')
+        #self.assertEqual(0, ret_code)
+
+    def test_setup(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "def setUpModule():",
+            "    print 'here'",
+            "",
+            "class BaseTCase(TestCase):",
+            "    def test_foo(self):",
+            "        pass",
+            "",
+            "class BarTest(BaseTCase):",
+            "    pass"
+        )
+
+        ret_code = tester.run_test('pmod', m.cwd)
+        self.assertEqual(0, ret_code)
+
+    def test_names(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BaseTCase(TestCase):",
+            "   def test_foo(self):",
+            "       pass",
+            "",
+            "class BarTest(BaseTCase):",
+            "   pass"
+        )
+
+        ret_code = tester.run_test('pmod', m.cwd)
+        self.assertEqual(0, ret_code)
+
+        ret_code = tester.run_test('', m.cwd)
+        self.assertEqual(0, ret_code)
+
 
 class TestLoaderTest(TestCase):
-    def test_no_module(self):
+    def test_names(self):
+        return
         m = TestModule(
             "from unittest import TestCase",
             "",
@@ -438,10 +555,11 @@ class TestLoaderTest(TestCase):
         )
 
         # this should call load from name(s)
-        tl = tester.TestLoader('pmod', m.cwd)
+        #tl = tester.TestLoader('pmod', m.cwd)
         ret_code = tester.run_test('pmod', m.cwd)
 
     def test_module(self):
+        return
         m = TestModule(
             "from unittest import TestCase",
             "",
@@ -456,47 +574,9 @@ class TestLoaderTest(TestCase):
         tl = tester.TestLoader('pmod', m.cwd)
         pout.v(tl.module)
 
-class TesterTest(unittest.TestCase):
-    def test_run_module(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class BaseTCase(TestCase):",
-            "   def test_foo(self):",
-            "       pass",
-            "",
-            "class BarTest(BaseTCase):",
-            "   pass"
-        )
-        t = m.test
-        t.module_name = 'pmod'
-
-        ret_code = tester.run_test(t, m.cwd)
-        pout.v(ret_code)
-
-
-    def test_tcase(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class BaseTCase(TestCase):",
-            "   def test_foo(self):",
-            "       pass",
-            "",
-            "class BarTest(BaseTCase):",
-            "   pass"
-        )
-
-        for tc in tester.get_testcase_generator(m.path, 'Bar'):
-            m = tc.method('foo', True)
-            self.assertEqual('test_foo', m)
-
-            m = tc.method('test_foo', True)
-            self.assertEqual('test_foo', m)
-
-
 
     def test_getting_test(self):
+        return
         m = TestModule(
             "from unittest import TestCase",
             "",
