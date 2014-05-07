@@ -17,5 +17,6 @@ def out(format_str, *args, **kwargs):
 
 
 def debug(*args, **kwargs):
-    if debug:
+    global DEBUG
+    if DEBUG:
         out(*args, **kwargs)
