@@ -14,15 +14,6 @@ from . import echo
 
 
 class TestInfo(object):
-#    @property
-#    def suite(self):
-#        ts = unittest.TestSuite()
-#        for i, tc in enumerate(self.possible, 1):
-#            echo.debug("{}. Searching for test matching: {}", i, tc)
-#            ts.addTest(tc.suite)
-#
-#        return ts
-
     def __init__(self, name, basedir, method_prefix='test', **kwargs):
         self.name = name
         self.basedir = basedir
@@ -82,23 +73,6 @@ class TestInfo(object):
 
 
 class TestCaseInfo(object):
-
-    #method_prefix = 'test'
-
-#    @property
-#    def suite(self):
-#        """
-#        https://docs.python.org/2/library/unittest.html#unittest.TestSuite
-#        """
-#        ts = unittest.TestSuite()
-##        class_name = getattr(self, 'class_name', u'')
-##        method_name = getattr(self, 'method_name', u'')
-#        for c, mn in self.method_names():
-#            echo.debug('adding test to suite: {}', mn)
-#            ts.addTest(c(mn))
-#
-#        return ts
-
     def __init__(self, basedir, method_prefix='test', **kwargs):
         self.basedir = basedir
         self.method_prefix = method_prefix
@@ -213,17 +187,9 @@ class TestCaseInfo(object):
                         echo.debug('module: {}', filepath)
                         yield filepath
 
-#        if not found:
-#            raise LookupError(
-#                u'No test module for basedir: "{}", module_name: "{}", module_prefix: "{}"'.format(
-#                    basedir,
-#                    module_name,
-#                    module_prefix
-#                )
-#            )
-
     def module_path(self, filepath):
-        # TODO -- I don't think this works or does anything useful
+        """given a filepath like /base/path/to/module.py this will convert it to
+        path.to.module so it can be imported"""
         basedir = self.basedir
         module_name = filepath.replace(basedir, u'', 1)
         module_name = module_name.strip('\\/')
@@ -259,7 +225,6 @@ class TestLoader(unittest.TestLoader):
     def __init__(self, basedir):
         super(TestLoader, self).__init__()
         self.basedir = self.normalize_dir(basedir)
-        self.found = 0
 
     def normalize_dir(self, d):
         '''
@@ -273,7 +238,6 @@ class TestLoader(unittest.TestLoader):
         return d
 
     def loadTestsFromName(self, name, *args, **kwargs):
-        self.found = 0
         ts = self.suiteClass()
         ti = TestInfo(name, self.basedir, self.testMethodPrefix)
         for i, tc in enumerate(ti.possible, 1):
@@ -281,19 +245,16 @@ class TestLoader(unittest.TestLoader):
             if tc.has_method():
                 for c, mn in tc.method_names():
                     echo.debug('adding test method to suite: {}', mn)
-                    self.found += 1
                     ts.addTest(c(mn))
 
             elif tc.has_class():
                 for c in tc.classes():
                     echo.debug('adding testcase to suite: {}', c.__name__)
-                    self.found += 1
                     ts.addTest(self.loadTestsFromTestCase(c))
 
             else:
                 for m in tc.modules():
                     echo.debug('adding module to suite: {}', m.__name__)
-                    self.found += 1
                     ts.addTest(self.loadTestsFromModule(m))
 
         return ts
@@ -307,30 +268,6 @@ class TestLoader(unittest.TestLoader):
 
         return ts
         #return super(TestLoader, self).loadTestsFromNames(*args, **kwargs)
-
-#    def loadTestsFromTestCase(self, *args, **kwargs):
-#        echo.debug('load from test case')
-#        ti = TestInfo('', self.basedir)
-#        return ti.suite
-#        #return super(TestLoader, self).loadTestsFromTestCase(*args, **kwargs)
-#
-#    def loadTestsFromModule(self, *args, **kwargs):
-#        echo.debug('load from module')
-#        ti = TestInfo('', self.basedir)
-#        return ti.suite
-#        #return super(TestLoader, self).loadTestsFromModule(*args, **kwargs)
-#
-#    def getTestCaseNames(self, *args, **kwargs):
-#        echo.debug('get test case names')
-#        ti = TestInfo('', self.basedir)
-#        return ti.suite
-#        #return super(TestLoader, self).getTestCaseNames(*args, **kwargs)
-#
-#    def discover(self, *args, **kwargs):
-#        echo.debug('discover')
-#        ti = TestInfo('', self.basedir)
-#        return ti.suite
-#        #return super(TestLoader, self).discover(*args, **kwargs)
 
 
 def run_test(name, basedir, **kwargs):
@@ -351,18 +288,12 @@ def run_test(name, basedir, **kwargs):
     #kwargs.setdefault('failfast', True)
     kwargs.setdefault('testLoader', tl)
 
-    #echo.out("Test: {}", test)
-    try:
-        # https://docs.python.org/2/library/unittest.html#unittest.main
-        ret = unittest.main(**kwargs)
-        if len(ret.result.errors) or len(ret.result.failures):
-            ret_code = 1
+    # https://docs.python.org/2/library/unittest.html#unittest.main
+    ret = unittest.main(**kwargs)
+    if len(ret.result.errors) or len(ret.result.failures):
+        ret_code = 1
 
-        elif not tl.found:
-            ret_code = 1
-
-    except LookupError, e:
-        echo.debug(e)
+    elif not ret.result.testsRun:
         ret_code = 1
 
     echo.debug('Test returned: {}', ret_code)

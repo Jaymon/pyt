@@ -13,7 +13,7 @@ from . import tester
 from . import echo
 
 
-__version__ = '0.6.7'
+__version__ = '0.6.8'
 
 def console():
     '''
@@ -35,20 +35,8 @@ def console():
 
     echo.DEBUG = args.debug
 
-    # we want to strip current working directory here and add basedir to the pythonpath
-#    curdir = normalize_dir(os.curdir)
-#    basedir = normalize_dir(args.basedir)
-
-    # remove current dir paths because basedir will be the dir the code should think it is executing in
-#    for p in ['', curdir, os.curdir, '{}{}'.format(os.curdir, os.sep)]:
-#        if p in sys.path:
-#            sys.path.remove(p)
-#
-#    sys.path.insert(0, basedir)
     test_args.insert(0, sys.argv[0])
     ret_code = 0
-
-    #echo.debug('basedir: {}', basedir)
 
     for name in args.names:
         ret_code |= tester.run_test(
