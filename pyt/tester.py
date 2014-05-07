@@ -14,19 +14,20 @@ from . import echo
 
 
 class TestInfo(object):
-    @property
-    def suite(self):
-        self.set_possible()
-        ts = unittest.TestSuite()
-        for i, tc in enumerate(self.possible, 1):
-            echo.debug("{}. Searching for test matching: {}", i, tc)
-            ts.addTest(tc.suite)
+#    @property
+#    def suite(self):
+#        ts = unittest.TestSuite()
+#        for i, tc in enumerate(self.possible, 1):
+#            echo.debug("{}. Searching for test matching: {}", i, tc)
+#            ts.addTest(tc.suite)
+#
+#        return ts
 
-        return ts
-
-    def __init__(self, name, basedir, **kwargs):
+    def __init__(self, name, basedir, method_prefix='test', **kwargs):
         self.name = name
         self.basedir = basedir
+        self.method_prefix = method_prefix
+        self.set_possible()
 
     def set_possible(self):
         '''
@@ -43,18 +44,19 @@ class TestInfo(object):
         module_class = u''
         module_method = u''
         module_prefix = u''
+        method_prefix = self.method_prefix
 
         # check if the last bit is a Class
         if re.search(ur'^[A-Z]', bits[-1]):
             echo.debug('Found class in name: {}', bits[-1])
-            possible.append(TestCaseInfo(basedir, **{
+            possible.append(TestCaseInfo(basedir, method_prefix, **{
                 'class_name': bits[-1],
                 'module_name': bits[-2] if len(bits) > 1 else u'',
                 'prefix': os.sep.join(bits[0:-2])
             }))
         elif len(bits) > 1 and re.search(ur'^[A-Z]', bits[-2]):
             echo.debug('Found class in name: {}', bits[-2])
-            possible.append(TestCaseInfo(basedir, **{
+            possible.append(TestCaseInfo(basedir, method_prefix, **{
                 'class_name': bits[-2],
                 'method_name': bits[-1],
                 'module_name': bits[-3] if len(bits) > 2 else u'',
@@ -63,44 +65,57 @@ class TestInfo(object):
         else:
             if self.name:
                 echo.debug('name is ambiguous')
-                possible.append(TestCaseInfo(basedir, **{
+                possible.append(TestCaseInfo(basedir, method_prefix, **{
                     'module_name': bits[-1],
                     'prefix': os.sep.join(bits[0:-1])
                 }))
-                possible.append(TestCaseInfo(basedir, **{
+                possible.append(TestCaseInfo(basedir, method_prefix, **{
                     'method_name': bits[-1],
                     'module_name': bits[-2] if len(bits) > 1 else u'',
                     'prefix': os.sep.join(bits[0:-2])
                 }))
 
             else:
-                possible.append(TestCaseInfo(basedir))
+                possible.append(TestCaseInfo(basedir, method_prefix))
 
         self.possible = possible
 
 
 class TestCaseInfo(object):
 
-    method_prefix = 'test'
+    #method_prefix = 'test'
 
-    @property
-    def suite(self):
-        """
-        https://docs.python.org/2/library/unittest.html#unittest.TestSuite
-        """
-        ts = unittest.TestSuite()
-#        class_name = getattr(self, 'class_name', u'')
-#        method_name = getattr(self, 'method_name', u'')
-        for c, mn in self.method_names():
-            echo.debug('adding test to suite: {}', mn)
-            ts.addTest(c(mn))
+#    @property
+#    def suite(self):
+#        """
+#        https://docs.python.org/2/library/unittest.html#unittest.TestSuite
+#        """
+#        ts = unittest.TestSuite()
+##        class_name = getattr(self, 'class_name', u'')
+##        method_name = getattr(self, 'method_name', u'')
+#        for c, mn in self.method_names():
+#            echo.debug('adding test to suite: {}', mn)
+#            ts.addTest(c(mn))
+#
+#        return ts
 
-        return ts
-
-    def __init__(self, basedir, **kwargs):
+    def __init__(self, basedir, method_prefix='test', **kwargs):
         self.basedir = basedir
+        self.method_prefix = method_prefix
         for k, v in kwargs.iteritems():
             setattr(self, k, v)
+
+    def has_module(self):
+        v = getattr(self, 'module_name', None)
+        return bool(v)
+
+    def has_class(self):
+        v = getattr(self, 'class_name', None)
+        return bool(v)
+
+    def has_method(self):
+        v = getattr(self, 'method_name', None)
+        return bool(v)
 
     def __str__(self):
         ret = u''
@@ -198,14 +213,14 @@ class TestCaseInfo(object):
                         echo.debug('module: {}', filepath)
                         yield filepath
 
-        if not found:
-            raise LookupError(
-                u'No test module for basedir: "{}", module_name: "{}", module_prefix: "{}"'.format(
-                    basedir,
-                    module_name,
-                    module_prefix
-                )
-            )
+#        if not found:
+#            raise LookupError(
+#                u'No test module for basedir: "{}", module_name: "{}", module_prefix: "{}"'.format(
+#                    basedir,
+#                    module_name,
+#                    module_prefix
+#                )
+#            )
 
     def module_path(self, filepath):
         # TODO -- I don't think this works or does anything useful
@@ -244,6 +259,7 @@ class TestLoader(unittest.TestLoader):
     def __init__(self, basedir):
         super(TestLoader, self).__init__()
         self.basedir = self.normalize_dir(basedir)
+        self.found = 0
 
     def normalize_dir(self, d):
         '''
@@ -257,12 +273,34 @@ class TestLoader(unittest.TestLoader):
         return d
 
     def loadTestsFromName(self, name, *args, **kwargs):
-        ti = TestInfo(name, self.basedir)
-        return ti.suite
+        self.found = 0
+        ts = self.suiteClass()
+        ti = TestInfo(name, self.basedir, self.testMethodPrefix)
+        for i, tc in enumerate(ti.possible, 1):
+            echo.debug("{}. Searching for test matching: {}", i, tc)
+            if tc.has_method():
+                for c, mn in tc.method_names():
+                    echo.debug('adding test method to suite: {}', mn)
+                    self.found += 1
+                    ts.addTest(c(mn))
+
+            elif tc.has_class():
+                for c in tc.classes():
+                    echo.debug('adding testcase to suite: {}', c.__name__)
+                    self.found += 1
+                    ts.addTest(self.loadTestsFromTestCase(c))
+
+            else:
+                for m in tc.modules():
+                    echo.debug('adding module to suite: {}', m.__name__)
+                    self.found += 1
+                    ts.addTest(self.loadTestsFromModule(m))
+
+        return ts
         #return super(TestLoader, self).loadTestsFromName(*args, **kwargs)
 
     def loadTestsFromNames(self, names, *args, **kwargs):
-        ts = unittest.TestSuite()
+        ts = self.suiteClass()
         for name in names:
             name_suite = self.loadTestsFromName(name, *args, **kwargs)
             ts.addTest(name_suite)
@@ -270,29 +308,29 @@ class TestLoader(unittest.TestLoader):
         return ts
         #return super(TestLoader, self).loadTestsFromNames(*args, **kwargs)
 
-    def loadTestsFromTestCase(self, *args, **kwargs):
-        echo.debug('load from test case')
-        ti = TestInfo('', self.basedir)
-        return ti.suite
-        #return super(TestLoader, self).loadTestsFromTestCase(*args, **kwargs)
-
-    def loadTestsFromModule(self, *args, **kwargs):
-        echo.debug('load from module')
-        ti = TestInfo('', self.basedir)
-        return ti.suite
-        #return super(TestLoader, self).loadTestsFromModule(*args, **kwargs)
-
-    def getTestCaseNames(self, *args, **kwargs):
-        echo.debug('get test case names')
-        ti = TestInfo('', self.basedir)
-        return ti.suite
-        #return super(TestLoader, self).getTestCaseNames(*args, **kwargs)
-
-    def discover(self, *args, **kwargs):
-        echo.debug('discover')
-        ti = TestInfo('', self.basedir)
-        return ti.suite
-        #return super(TestLoader, self).discover(*args, **kwargs)
+#    def loadTestsFromTestCase(self, *args, **kwargs):
+#        echo.debug('load from test case')
+#        ti = TestInfo('', self.basedir)
+#        return ti.suite
+#        #return super(TestLoader, self).loadTestsFromTestCase(*args, **kwargs)
+#
+#    def loadTestsFromModule(self, *args, **kwargs):
+#        echo.debug('load from module')
+#        ti = TestInfo('', self.basedir)
+#        return ti.suite
+#        #return super(TestLoader, self).loadTestsFromModule(*args, **kwargs)
+#
+#    def getTestCaseNames(self, *args, **kwargs):
+#        echo.debug('get test case names')
+#        ti = TestInfo('', self.basedir)
+#        return ti.suite
+#        #return super(TestLoader, self).getTestCaseNames(*args, **kwargs)
+#
+#    def discover(self, *args, **kwargs):
+#        echo.debug('discover')
+#        ti = TestInfo('', self.basedir)
+#        return ti.suite
+#        #return super(TestLoader, self).discover(*args, **kwargs)
 
 
 def run_test(name, basedir, **kwargs):
@@ -318,6 +356,9 @@ def run_test(name, basedir, **kwargs):
         # https://docs.python.org/2/library/unittest.html#unittest.main
         ret = unittest.main(**kwargs)
         if len(ret.result.errors) or len(ret.result.failures):
+            ret_code = 1
+
+        elif not tl.found:
             ret_code = 1
 
     except LookupError, e:

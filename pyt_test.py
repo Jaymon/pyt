@@ -346,6 +346,11 @@ class TestModule(object):
         return t
 
     @property
+    def tl(self):
+        tl = tester.TestLoader(self.cwd)
+        return tl
+
+    @property
     def tci(self):
         """return a TestCaseInfo instance for this module"""
         tc = tester.TestCaseInfo(
@@ -381,27 +386,6 @@ class TestModule(object):
 
 
 class TestCaseInfoTest(TestCase):
-    def test_suite(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class CheTest(TestCase):",
-            "   def test_foo(self): pass"
-        )
-
-        tc = m.tci
-        s = tc.suite
-        self.assertTrue('test_foo' in str(s))
-
-        tc.class_name = 'Bar'
-        tc.method_name = 'foo'
-        s = tc.suite
-        self.assertFalse('test_foo' in str(s))
-
-        tc.class_name = ''
-        tc.method_name = 'foo'
-        s = tc.suite
-        self.assertTrue('test_foo' in str(s))
 
     def test_method_names(self):
         m = TestModule(
@@ -434,8 +418,9 @@ class TestCaseInfoTest(TestCase):
         self.assertEqual(1, len(cs))
 
         tc.prefix = 'boom.bam'
-        with self.assertRaises(LookupError):
-            cs = list(tc.paths())
+        #with self.assertRaises(LookupError):
+        cs = list(tc.paths())
+        self.assertEqual(0, len(cs))
 
     def test_classes(self):
         m = TestModule(
@@ -567,6 +552,24 @@ class RunTestTest(TestCase):
 
 
 class TestLoaderTest(TestCase):
+    def test_suite(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class CheTest(TestCase):",
+            "   def test_foo(self): pass"
+        )
+
+        tl = m.tl
+        s = tl.loadTestsFromName(m.name)
+        self.assertTrue('test_foo' in str(s))
+
+        s = tl.loadTestsFromName('{}.Bar.foo'.format(m.name))
+        self.assertFalse('test_foo' in str(s))
+
+        s = tl.loadTestsFromName('{}.foo'.format(m.name))
+        self.assertTrue('test_foo' in str(s))
+
     def test_names(self):
         return
         m = TestModule(
