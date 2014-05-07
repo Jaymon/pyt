@@ -487,6 +487,15 @@ class TestInfoTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_cli_2(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "raise ValueError('foo')"
+        )
+
+        ret_code = tester.run_test('pmod', m.cwd)
+
     def test_cli(self):
         m = TestModule(
             "from unittest import TestCase",

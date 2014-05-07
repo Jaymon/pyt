@@ -13,7 +13,7 @@ from . import tester
 from . import echo
 
 
-__version__ = '0.6.5'
+__version__ = '0.6.6'
 
 def console():
     '''
@@ -27,6 +27,7 @@ def console():
     parser.add_argument('--debug', dest='debug', action='store_true', help='print debugging info')
     parser.add_argument("-v", "--version", action='version', version="%(prog)s {}".format(__version__))
 
+    # https://docs.python.org/2/library/unittest.html#command-line-options
     parser.add_argument('--not-failfast', dest='not_failfast', action='store_true', help='turns off fail fast')
     parser.add_argument('--not-buffer', dest='not_buffer', action='store_true', help='turns off buffer')
 

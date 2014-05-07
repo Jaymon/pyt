@@ -84,6 +84,9 @@ class TestCaseInfo(object):
 
     @property
     def suite(self):
+        """
+        https://docs.python.org/2/library/unittest.html#unittest.TestSuite
+        """
         ts = unittest.TestSuite()
 #        class_name = getattr(self, 'class_name', u'')
 #        method_name = getattr(self, 'method_name', u'')
@@ -112,8 +115,14 @@ class TestCaseInfo(object):
         module_name = getattr(self, 'module_name', u'TestCaseInfo_modules')
         for p in self.paths():
             # http://stackoverflow.com/questions/67631/
-            m = imp.load_source(module_name, p)
-            yield m
+            try:
+                m = imp.load_source(module_name, p)
+                yield m
+
+            except Exception, e:
+                echo.debug("could not load module: {}", p)
+                echo.debug(e)
+                continue
 
     def classes(self):
         """the partial self.class_name will be used to find actual TestCase classes"""
@@ -222,6 +231,9 @@ class TestCaseInfo(object):
 
 
 class TestLoader(unittest.TestLoader):
+    """
+    https://docs.python.org/2/library/unittest.html#unittest.TestLoader
+    """
     def __init__(self, basedir):
         super(TestLoader, self).__init__()
         self.basedir = self.normalize_dir(basedir)
@@ -296,6 +308,7 @@ def run_test(name, basedir, **kwargs):
 
     #echo.out("Test: {}", test)
     try:
+        # https://docs.python.org/2/library/unittest.html#unittest.main
         ret = unittest.main(**kwargs)
         if len(ret.result.errors) or len(ret.result.failures):
             ret_code = 1
