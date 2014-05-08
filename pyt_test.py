@@ -472,6 +472,25 @@ class TestInfoTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_parse_error(self):
+        cwd = testdata.create_dir()
+        testdata.create_modules(
+            {
+                'tests_parse_error': 'from unittest import TestCase',
+                'tests_parse_error.pefoo_test': "\n".join([
+                    'from . import TestCase',
+                    '',
+                    'class PEFooTest(TestCase):',
+                    '    def test_bar(self):',
+                    '        foo = "this is a parse error'
+                ])
+            },
+            tmpdir=cwd
+        )
+
+        with self.assertRaises(SyntaxError):
+            ret_code = tester.run_test('PEFoo.bar', cwd)
+
     def test_relative_import(self):
         cwd = testdata.create_dir()
         testdata.create_modules(
@@ -489,14 +508,40 @@ class RunTestTest(TestCase):
 
         ret_code = tester.run_test('Foo.bar', cwd)
 
-    def test_cli_2(self):
+    def test_cli_errors(self):
+        # if there is an error in one of the tests but another test is found, don't
+        # bubble up the error
+        cwd = testdata.create_dir()
+        testdata.create_modules(
+            {
+                'cli_2': 'from unittest import TestCase',
+                'cli_2.clibar_test': "\n".join([
+                    'from . import TestCase',
+                    '',
+                    "raise ValueError('foo')"
+                ]),
+                'cli_2.clifoo_test': "\n".join([
+                    'from . import TestCase',
+                    '',
+                    'class CliFooTest(TestCase):',
+                    '    def test_bar(self): pass',
+                ])
+            },
+            tmpdir=cwd
+        )
+
+        ret_code = tester.run_test('clifoo', cwd)
+        self.assertEqual(0, ret_code)
+
+        # if there is an error and no other test is found, bubble up the error
         m = TestModule(
             "from unittest import TestCase",
             "",
             "raise ValueError('foo')"
         )
 
-        ret_code = tester.run_test('pmod', m.cwd)
+        with self.assertRaises(ValueError):
+            ret_code = tester.run_test('pmod', m.cwd)
 
     def test_cli(self):
         m = TestModule(

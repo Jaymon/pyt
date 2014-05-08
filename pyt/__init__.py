@@ -13,7 +13,7 @@ from . import tester
 from . import echo
 
 
-__version__ = '0.7'
+__version__ = '0.7.1'
 
 def console():
     '''

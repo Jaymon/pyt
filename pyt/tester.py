@@ -20,6 +20,11 @@ class TestInfo(object):
         self.method_prefix = method_prefix
         self.set_possible()
 
+    def raise_any_error(self):
+        """raise any found error in the possible TestCaseInfos"""
+        for tc in self.possible:
+            tc.raise_found_error()
+
     def set_possible(self):
         '''
         break up a module path to its various parts (prefix, module, class, method)
@@ -100,6 +105,12 @@ class TestCaseInfo(object):
 
         return ret.rstrip(', ')
 
+    def raise_found_error(self):
+        """raise an error if one was found, otherwise do nothing"""
+        error_info = getattr(self, 'error_info', None)
+        if error_info:
+            raise error_info[0].__class__, error_info[0], error_info[1][2]
+
     def modules(self):
         """return modules that match module_name"""
         # this is a hack, I couldn't get imp.load_source to work right
@@ -113,8 +124,12 @@ class TestCaseInfo(object):
                 yield m
 
             except Exception, e:
-                echo.debug("could not load module: {}", p)
-                echo.debug(e)
+                echo.debug('Caught exception while importing {}: {}', p, e)
+                error_info = getattr(self, 'error_info', None)
+                if not error_info:
+                    exc_info = sys.exc_info()
+                    #raise e.__class__, e, exc_info[2]
+                    self.error_info = (e, exc_info)
                 continue
 
         sys.path.pop(0)
@@ -240,25 +255,32 @@ class TestLoader(unittest.TestLoader):
     def loadTestsFromName(self, name, *args, **kwargs):
         ts = self.suiteClass()
         ti = TestInfo(name, self.basedir, self.testMethodPrefix)
+        found = False
         for i, tc in enumerate(ti.possible, 1):
             echo.debug("{}. Searching for test matching: {}", i, tc)
             if tc.has_method():
                 for c, mn in tc.method_names():
                     #echo.debug('adding test method to suite: {}', mn)
                     echo.out('Found test: {}.{}.{}', c.__module__, c.__name__, mn)
+                    found = True
                     ts.addTest(c(mn))
 
             elif tc.has_class():
                 for c in tc.classes():
                     #echo.debug('adding testcase to suite: {}', c.__name__)
                     echo.out('Found test: {}.{}', c.__module__, c.__name__)
+                    found = True
                     ts.addTest(self.loadTestsFromTestCase(c))
 
             else:
                 for m in tc.modules():
                     #echo.debug('adding module to suite: {}', m.__name__)
                     echo.out('Found test: {}', m.__name__)
+                    found = True
                     ts.addTest(self.loadTestsFromModule(m))
+
+        if not found:
+            ti.raise_any_error()
 
         return ts
         #return super(TestLoader, self).loadTestsFromName(*args, **kwargs)
