@@ -195,10 +195,18 @@ class TestCaseInfo(object):
         found = False
         module_regex = ''
         if module_name:
-            module_regex = re.compile(
-                ur'^(?:test_?{}|{}.*?_?test|{})\.py$'.format(module_name, module_name, module_name),
-                re.I
-            )
+            if module_name.startswith('test') or module_name.endswith('test'):
+                module_regex = re.compile(
+                    ur'^{}\.py$'.format(module_name),
+                    re.I
+                )
+
+            else:
+                module_regex = re.compile(
+                    ur'^(?:test_?{}|{}.*?_?test)\.py$'.format(module_name, module_name),
+                    re.I
+                )
+
         else:
             module_regex = re.compile(ur'^(?:test\S+|\S+test)\.py$', re.I)
 
