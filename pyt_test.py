@@ -599,6 +599,28 @@ class RunTestTest(TestCase):
         self.assertTrue('Found module test: prefix_search.foo_test' in r)
         self.assertTrue('test_foo' not in r)
 
+    def test_ignore_non_test_modules(self):
+        """make sure similar named non-test modules are ignored"""
+        cwd = testdata.create_dir()
+        testdata.create_modules(
+            {
+                'tintm.tint_test': "\n".join([
+                    "from unittest import TestCase",
+                    "",
+                    "class FooTest(TestCase):",
+                    "    def test_foo(self):",
+                    "        pass",
+
+                ]),
+                'tintm.tint': ""
+            },
+            tmpdir=cwd
+        )
+
+        s = Client(cwd)
+        r = s.run('tint --debug')
+        self.assertEqual(1, r.count('Found module test'))
+
     def test_prefix_search(self):
         m = TestModule(
             "from unittest import TestCase",
