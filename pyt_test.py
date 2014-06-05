@@ -308,8 +308,9 @@ class Client(object):
     def __init__(self, cwd):
         self.cwd = cwd
 
-    def run(self, arg_str=''):
+    def run(self, arg_str='', **options):
         cmd = "python -m pyt --basedir={} {}".format(self.cwd, arg_str)
+        expected_ret_code = options.get('code', 0)
 
         r = ''
         try:
@@ -329,7 +330,7 @@ class Client(object):
                 sys.stdout.flush()
                 r += char
 
-            if process.returncode > 0:
+            if process.returncode != expected_ret_code:
                 raise RuntimeError("cmd returned {} with output".format(process.returncode, r))
 
         except subprocess.CalledProcessError, e:
@@ -472,6 +473,29 @@ class TestInfoTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_failfast(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class FailFastTestCase(TestCase):",
+            "   def test_aoo(self):",
+            "       self.assertTrue(True)",
+            "",
+            "   def test_foo(self):",
+            "       self.assertTrue(False)",
+            "",
+            "   def test_zoo(self):",
+            "       self.assertTrue(True)",
+        )
+
+        s = Client(m.cwd)
+
+        r = s.run('--all', code=1)
+        self.assertTrue('.F.' not in r)
+
+        r = s.run('--all --not-failfast', code=1)
+        self.assertTrue('.F.' in r)
+
     def test_parse_error(self):
         cwd = testdata.create_dir()
         testdata.create_modules(
@@ -558,6 +582,57 @@ class RunTestTest(TestCase):
         with self.assertRaises(RuntimeError):
             r = s.run('blah.blarg.blorg --debug')
         #self.assertEqual(0, ret_code)
+
+    def test_found_module_ignore_method(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class FooTest(TestCase):",
+            "    def test_foo(self):",
+            "        pass",
+            name='prefix_search.foo_test'
+        )
+
+        s = Client(m.cwd)
+
+        r = s.run('foo --debug')
+        self.assertTrue('Found module test: prefix_search.foo_test' in r)
+        self.assertTrue('test_foo' not in r)
+
+    def test_prefix_search(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BarTest(TestCase):",
+            "    def test_handshake(self):",
+            "        pass",
+            "    def test_bad_accept_handshake(self):",
+            "        pass",
+            "",
+            "class FooBarTest(TestCase):",
+            "    def test_blah(self):",
+            "        pass",
+            name='prefix_search.chebaz_test'
+        )
+
+        s = Client(m.cwd)
+
+        r = s.run('che --debug')
+        self.assertTrue('Found module test: prefix_search.chebaz_test' in r)
+
+        with self.assertRaises(RuntimeError):
+            r = s.run('baz --debug')
+
+        # maybe add this sometime in the future
+        #r = s.run('Bar.*handshake --debug')
+        #pout.v(r)
+        #self.assertTrue('bad_accept_handshake' not in r)
+
+        r = s.run('Bar.handshake --debug')
+        self.assertTrue('bad_accept_handshake' not in r)
+
+        r = s.run('Bar --debug')
+        self.assertTrue('FooBarTest' not in r)
 
     def test_setup(self):
         m = TestModule(

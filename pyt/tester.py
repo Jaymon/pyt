@@ -139,14 +139,18 @@ class TestCaseInfo(object):
         for module in self.modules():
             cs = inspect.getmembers(module, inspect.isclass)
             class_name = getattr(self, 'class_name', u'')
+            class_regex = ''
+            if class_name:
+                class_regex = re.compile(ur'^{}'.format(class_name), re.I)
 
             for c_name, c in cs:
                 can_yield = True
-                if class_name and class_name not in c_name:
+                if class_regex and not class_regex.match(c_name):
+                #if class_name and class_name not in c_name:
                     can_yield = False
 
                 if can_yield and issubclass(c, unittest.TestCase):
-                    if c is not unittest.TestCase:
+                    if c is not unittest.TestCase: # ignore actual TestCase class
                         echo.debug('class: {}', c_name)
                         yield c
 
@@ -155,12 +159,18 @@ class TestCaseInfo(object):
         for c in self.classes():
             ms = inspect.getmembers(c, inspect.ismethod)
             method_name = getattr(self, 'method_name', u'')
+            method_regex = ''
+            if method_name:
+                method_regex = re.compile(
+                    ur'^{}[_]{{0,1}}{}'.format(self.method_prefix, method_name),
+                    re.I
+                )
 
             for m_name, m in ms:
                 if not m_name.startswith(self.method_prefix): continue
 
                 can_yield = True
-                if method_name and method_name not in m_name:
+                if method_regex and not method_regex.match(m_name):
                     can_yield = False
 
                 if can_yield:
@@ -179,7 +189,15 @@ class TestCaseInfo(object):
         basedir = self.basedir
 
         found = False
-        module_regex = re.compile(ur'^(?:test\S+|\S+test)\.py$', re.I)
+        module_regex = ''
+        if module_name:
+            module_regex = re.compile(
+                ur'^(?:test_?{}|{}.*?_?test|{})\.py$'.format(module_name, module_name, module_name),
+                re.I
+            )
+        else:
+            module_regex = re.compile(ur'^(?:test\S+|\S+test)\.py$', re.I)
+
         prefix_regex = ''
         if module_prefix:
             #prefix_regex = re.compile(module_prefix.replace('.', '[\\/]'), re.I)
@@ -192,15 +210,10 @@ class TestCaseInfo(object):
 
             for f in files:
                 if module_regex.search(f):
-                    can_yield = True
-                    if module_name and module_name not in f:
-                        can_yield = False
-
-                    if can_yield:
-                        filepath = os.path.join(root, f)
-                        found = True
-                        echo.debug('module: {}', filepath)
-                        yield filepath
+                    filepath = os.path.join(root, f)
+                    found = True
+                    echo.debug('module: {}', filepath)
+                    yield filepath
 
     def module_path(self, filepath):
         """given a filepath like /base/path/to/module.py this will convert it to
@@ -261,23 +274,26 @@ class TestLoader(unittest.TestLoader):
             if tc.has_method():
                 for c, mn in tc.method_names():
                     #echo.debug('adding test method to suite: {}', mn)
-                    echo.out('Found test: {}.{}.{}', c.__module__, c.__name__, mn)
+                    echo.out('Found method test: {}.{}.{}', c.__module__, c.__name__, mn)
                     found = True
                     ts.addTest(c(mn))
 
             elif tc.has_class():
                 for c in tc.classes():
                     #echo.debug('adding testcase to suite: {}', c.__name__)
-                    echo.out('Found test: {}.{}', c.__module__, c.__name__)
+                    echo.out('Found class test: {}.{}', c.__module__, c.__name__)
                     found = True
                     ts.addTest(self.loadTestsFromTestCase(c))
 
             else:
                 for m in tc.modules():
                     #echo.debug('adding module to suite: {}', m.__name__)
-                    echo.out('Found test: {}', m.__name__)
+                    echo.out('Found module test: {}', m.__name__)
                     found = True
                     ts.addTest(self.loadTestsFromModule(m))
+
+                # if we found a module that matched then don't try for method
+                if found: break
 
         if not found:
             ti.raise_any_error()
@@ -299,7 +315,6 @@ def run_test(name, basedir, **kwargs):
     '''
     run the test found with find_test() with unittest
 
-    test -- Test -- the found test
     **kwargs -- dict -- all other args to pass to unittest
     '''
     ret_code = 0
