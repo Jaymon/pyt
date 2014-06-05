@@ -46,16 +46,10 @@ To run more than one test:
 
 To run every test `pyt` can find:
 
-    $ pyt
+    $ pyt --all
 
 
 ### Things to be aware of
-
-#### Running all tests
-
-You can run all tests in your directory by running:
-
-    $ pyt --all
 
 #### pyt uses Python's [PEP 8](http://www.python.org/dev/peps/pep-0008/) style conventions
 
