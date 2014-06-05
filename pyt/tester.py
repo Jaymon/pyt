@@ -161,10 +161,14 @@ class TestCaseInfo(object):
             method_name = getattr(self, 'method_name', u'')
             method_regex = ''
             if method_name:
-                method_regex = re.compile(
-                    ur'^{}[_]{{0,1}}{}'.format(self.method_prefix, method_name),
-                    re.I
-                )
+                if method_name.startswith(self.method_prefix):
+                    method_regex = re.compile(ur'^{}'.format(method_name), re.I)
+
+                else:
+                    method_regex = re.compile(
+                        ur'^{}[_]{{0,1}}{}'.format(self.method_prefix, method_name),
+                        re.I
+                    )
 
             for m_name, m in ms:
                 if not m_name.startswith(self.method_prefix): continue

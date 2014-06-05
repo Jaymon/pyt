@@ -617,6 +617,12 @@ class RunTestTest(TestCase):
 
         s = Client(m.cwd)
 
+        r = s.run('test_handshake --debug')
+        self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
+
+        r = s.run('Bar.test_handshake --debug')
+        self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
+
         r = s.run('che --debug')
         self.assertTrue('Found module test: prefix_search.chebaz_test' in r)
 
