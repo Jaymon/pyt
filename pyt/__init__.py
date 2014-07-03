@@ -13,7 +13,7 @@ from . import tester
 from . import echo
 
 
-__version__ = '0.7.4'
+__version__ = '0.7.5'
 
 def console():
     '''
@@ -29,8 +29,8 @@ def console():
     parser.add_argument('--all', dest='run_all', action='store_true', help='run all tests if no NAME specified')
 
     # https://docs.python.org/2/library/unittest.html#command-line-options
-    parser.add_argument('--not-failfast', dest='not_failfast', action='store_false', help='turns off fail fast')
-    parser.add_argument('--not-buffer', dest='not_buffer', action='store_false', help='turns off buffer')
+    parser.add_argument('--no-failfast', dest='not_failfast', action='store_false', help='turns off fail fast')
+    parser.add_argument('--no-buffer', dest='not_buffer', action='store_false', help='turns off buffer')
 
     args, test_args = parser.parse_known_args()
 

@@ -493,7 +493,7 @@ class RunTestTest(TestCase):
         r = s.run('--all', code=1)
         self.assertTrue('.F.' not in r)
 
-        r = s.run('--all --not-failfast', code=1)
+        r = s.run('--all --no-failfast', code=1)
         self.assertTrue('.F.' in r)
 
     def test_parse_error(self):
