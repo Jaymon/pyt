@@ -314,7 +314,6 @@ class TestLoader(unittest.TestLoader):
             ti.raise_any_error()
 
         return ts
-        #return super(TestLoader, self).loadTestsFromName(*args, **kwargs)
 
     def loadTestsFromNames(self, names, *args, **kwargs):
         ts = self.suiteClass()
@@ -323,7 +322,6 @@ class TestLoader(unittest.TestLoader):
             ts.addTest(name_suite)
 
         return ts
-        #return super(TestLoader, self).loadTestsFromNames(*args, **kwargs)
 
 
 class TestResult(unittest.TextTestResult):
@@ -333,20 +331,17 @@ class TestResult(unittest.TextTestResult):
     stdout_buffer = StringIO()
     stderr_buffer = StringIO()
 
-#     _stdout_buffer = StringIO()
-#     _stderr_buffer = StringIO()
+#     def startTest(self, test):
+#         #pout.v('startTest')
+#         #pout.v("before start", id(sys.stdout), id(sys.stderr))
+#         super(TestResult, self).startTest(test)
+#         #pout.v("after start", id(sys.stdout), id(sys.stderr))
 
-    def startTest(self, test):
-        #pout.v('startTest')
-        #pout.v("before start", id(sys.stdout), id(sys.stderr))
-        super(TestResult, self).startTest(test)
-        #pout.v("after start", id(sys.stdout), id(sys.stderr))
-
-    def stopTest(self, test):
-        #pout.v('stopTest')
-        #pout.v("buffered stop", id(sys.stdout), id(sys.stderr))
-        super(TestResult, self).stopTest(test)
-        #pout.v("original stop", id(sys.stdout), id(sys.stderr))
+#     def stopTest(self, test):
+#         #pout.v('stopTest')
+#         #pout.v("buffered stop", id(sys.stdout), id(sys.stderr))
+#         super(TestResult, self).stopTest(test)
+#         #pout.v("original stop", id(sys.stdout), id(sys.stderr))
 
     def __init__(self, *args, **kwargs):
         super(TestResult, self).__init__(*args, **kwargs)
@@ -365,25 +360,6 @@ class TestRunner(unittest.TextTestRunner):
         super(TestRunner, self).__init__(stream=stream, *args, **kwargs)
 
 
-class TestBuffer(object):
-    ret_code = 0
-
-    @contextmanager
-    def buffering(self, **kwargs):
-        try:
-#             if kwargs.get('buffer', False):
-#                 sys.stdout = StringIO()
-#                 sys.stderr = StringIO()
-#                 pass
-
-            yield self
-
-        finally:
-            if self.ret_code > 0:
-                pass
-            pout.v(self.ret_code)
-
-
 def run_test(name, basedir, **kwargs):
     '''
     run the test found with find_test() with unittest
@@ -391,19 +367,11 @@ def run_test(name, basedir, **kwargs):
     **kwargs -- dict -- all other args to pass to unittest
     '''
     ret_code = 0
-    buf = TestBuffer()
-    #unittest.TextTestRunner.resultclass = TestResult
-
-    pout.v("original start of run", id(sys.stdout), id(sys.stderr))
 
     if kwargs.get('buffer', False):
-        #pout.v("BUFFERED")
         sys.stdout = TestResult.stdout_buffer
         sys.stderr = TestResult.stderr_buffer
 
-    #pout.v("buffered start of run", id(sys.stdout), id(sys.stderr))
-
-    #with buf.buffering(**kwargs):
     tl = TestLoader(basedir)
 
     kwargs.setdefault('argv', ['run_test'])
