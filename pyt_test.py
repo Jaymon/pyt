@@ -810,3 +810,48 @@ class TestLoaderTest(TestCase):
         test = pyt.get_test(basedir, filepath)
         self.assertEqual('three.seven_test', str(test))
 
+
+class TestResultTest(TestCase):
+    def test_buffering(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "import logging",
+            "import sys",
+            "",
+            "logging.basicConfig()",
+            "logger = logging.getLogger(__name__)",
+            "logger.setLevel(logging.DEBUG)",
+            "log_handler = logging.StreamHandler(stream=sys.stderr)",
+            "logger.addHandler(log_handler)",
+            "",
+            "class BaseTResultTestCase(TestCase):",
+            "   def test_success(self):",
+            "       logger.info('foo')",
+            "",
+            "   def test_failure(self):",
+            "       logger.info('foo')",
+            "       print 'bar'",
+            "       self.assertTrue(False)",
+            "",
+        )
+
+        search_str = '{}.BaseTResultTestCase.failure'.format(m.name)
+        t = tester.run_test(
+            search_str,
+            m.cwd,
+            buffer=True,
+        )
+
+        search_str = '{}.BaseTResultTestCase.success'.format(m.name)
+        t = tester.run_test(
+            search_str,
+            m.cwd,
+            buffer=True,
+        )
+
+        search_str = '{}.BaseTResultTestCase.success'.format(m.name)
+        t = tester.run_test(
+            search_str,
+            m.cwd
+        )
+

@@ -5,10 +5,13 @@ import os
 import ast
 import unittest
 from unittest import TestCase # to allow from pyt import TestCase, Assert
+#from unittest import TextTestRunner, TextTestResult
 import sys
 import inspect
 import imp
 import importlib
+from contextlib import contextmanager
+from StringIO import StringIO
 
 from . import echo
 
@@ -323,6 +326,64 @@ class TestLoader(unittest.TestLoader):
         #return super(TestLoader, self).loadTestsFromNames(*args, **kwargs)
 
 
+class TestResult(unittest.TextTestResult):
+    stdout_stream = sys.stdout
+    stderr_stream = sys.stderr
+
+    stdout_buffer = StringIO()
+    stderr_buffer = StringIO()
+
+#     _stdout_buffer = StringIO()
+#     _stderr_buffer = StringIO()
+
+    def startTest(self, test):
+        #pout.v('startTest')
+        #pout.v("before start", id(sys.stdout), id(sys.stderr))
+        super(TestResult, self).startTest(test)
+        #pout.v("after start", id(sys.stdout), id(sys.stderr))
+
+    def stopTest(self, test):
+        #pout.v('stopTest')
+        #pout.v("buffered stop", id(sys.stdout), id(sys.stderr))
+        super(TestResult, self).stopTest(test)
+        #pout.v("original stop", id(sys.stdout), id(sys.stderr))
+
+    def __init__(self, *args, **kwargs):
+        super(TestResult, self).__init__(*args, **kwargs)
+        self._original_stdout = self.stdout_stream
+        self._original_stderr = self.stderr_stream
+        self._stdout_buffer = self.stdout_buffer
+        self._stderr_buffer = self.stderr_buffer
+
+
+class TestRunner(unittest.TextTestRunner):
+    resultclass = TestResult
+
+    def __init__(self, stream=None, *args, **kwargs):
+        if not stream:
+            stream = self.resultclass.stderr_stream
+        super(TestRunner, self).__init__(stream=stream, *args, **kwargs)
+
+
+class TestBuffer(object):
+    ret_code = 0
+
+    @contextmanager
+    def buffering(self, **kwargs):
+        try:
+#             if kwargs.get('buffer', False):
+#                 sys.stdout = StringIO()
+#                 sys.stderr = StringIO()
+#                 pass
+
+            yield self
+
+        finally:
+            if self.ret_code > 0:
+                pass
+            pout.v(self.ret_code)
+
+
 def run_test(name, basedir, **kwargs):
     '''
     run the test found with find_test() with unittest
@@ -330,15 +391,27 @@ def run_test(name, basedir, **kwargs):
     **kwargs -- dict -- all other args to pass to unittest
     '''
     ret_code = 0
+    buf = TestBuffer()
+    #unittest.TextTestRunner.resultclass = TestResult
+
+    pout.v("original start of run", id(sys.stdout), id(sys.stderr))
+
+    if kwargs.get('buffer', False):
+        #pout.v("BUFFERED")
+        sys.stdout = TestResult.stdout_buffer
+        sys.stderr = TestResult.stderr_buffer
+
+    #pout.v("buffered start of run", id(sys.stdout), id(sys.stderr))
+
+    #with buf.buffering(**kwargs):
     tl = TestLoader(basedir)
 
     kwargs.setdefault('argv', ['run_test'])
     kwargs['argv'].append(name)
 
-    #kwargs.setdefault('module', tl.module)
     kwargs.setdefault('exit', False)
-    #kwargs.setdefault('failfast', True)
     kwargs.setdefault('testLoader', tl)
+    kwargs.setdefault('testRunner', TestRunner)
 
     # https://docs.python.org/2/library/unittest.html#unittest.main
     ret = unittest.main(**kwargs)
@@ -347,6 +420,10 @@ def run_test(name, basedir, **kwargs):
 
     elif not ret.result.testsRun:
         ret_code = 1
+
+    if kwargs.get('buffer', False):
+        sys.stdout = TestResult.stdout_stream
+        sys.stderr = TestResult.stderr_stream
 
     echo.debug('Test returned: {}', ret_code)
     return ret_code
