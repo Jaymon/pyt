@@ -325,6 +325,13 @@ class TestLoader(unittest.TestLoader):
 
 
 class TestResult(unittest.TextTestResult):
+    """
+    This is overridden so I can keep original copies of stdout and stderr, and also
+    so I can have control over the stringIO instances that would be used if buffer is
+    passed in. What was happening previously was our custom test loader would load
+    all the testing modules before unittest had a chance to buffer them, so they would
+    have real references to stdout/stderr and would still print out all the logging.
+    """
     stdout_stream = sys.stdout
     stderr_stream = sys.stderr
 
@@ -352,6 +359,12 @@ class TestResult(unittest.TextTestResult):
 
 
 class TestRunner(unittest.TextTestRunner):
+    """
+    This sets our custom result class and also makes sure the stream that gets passed
+    to the runner is the correct stderr stream and not a buffered stream, so it can
+    still print out the test information even though it buffers everything else, just
+    like how it is done with the original unittest
+    """
     resultclass = TestResult
 
     def __init__(self, stream=None, *args, **kwargs):
