@@ -37,45 +37,48 @@ class TestInfo(object):
         return -- list -- a list of possible interpretations of the module path
             (eg, foo.bar can be bar module in foo module, or bar method in foo module)
         '''
-        bits = self.name.split(u'.')
-        basedir = self.basedir
-        possible = []
-        module_class = u''
-        module_method = u''
-        module_prefix = u''
-        method_prefix = self.method_prefix
+        if ':' in self.name or os.sep in self.name:
+            # TODO: add support for path/something:Class.method
+            #filepath, method_path = self.name.split(":", 1)
+            pass
 
-        # check if the last bit is a Class
-        if re.search(ur'^[A-Z]', bits[-1]):
-            echo.debug('Found class in name: {}', bits[-1])
-            possible.append(TestCaseInfo(basedir, method_prefix, **{
-                'class_name': bits[-1],
-                'module_name': bits[-2] if len(bits) > 1 else u'',
-                'prefix': os.sep.join(bits[0:-2])
-            }))
-        elif len(bits) > 1 and re.search(ur'^[A-Z]', bits[-2]):
-            echo.debug('Found class in name: {}', bits[-2])
-            possible.append(TestCaseInfo(basedir, method_prefix, **{
-                'class_name': bits[-2],
-                'method_name': bits[-1],
-                'module_name': bits[-3] if len(bits) > 2 else u'',
-                'prefix': os.sep.join(bits[0:-3])
-            }))
         else:
-            if self.name:
-                echo.debug('name is ambiguous')
+            bits = self.name.split(u'.')
+            basedir = self.basedir
+            possible = []
+            method_prefix = self.method_prefix
+
+            # check if the last bit is a Class
+            if re.search(ur'^[A-Z]', bits[-1]):
+                echo.debug('Found class in name: {}', bits[-1])
                 possible.append(TestCaseInfo(basedir, method_prefix, **{
-                    'module_name': bits[-1],
-                    'prefix': os.sep.join(bits[0:-1])
-                }))
-                possible.append(TestCaseInfo(basedir, method_prefix, **{
-                    'method_name': bits[-1],
+                    'class_name': bits[-1],
                     'module_name': bits[-2] if len(bits) > 1 else u'',
                     'prefix': os.sep.join(bits[0:-2])
                 }))
-
+            elif len(bits) > 1 and re.search(ur'^[A-Z]', bits[-2]):
+                echo.debug('Found class in name: {}', bits[-2])
+                possible.append(TestCaseInfo(basedir, method_prefix, **{
+                    'class_name': bits[-2],
+                    'method_name': bits[-1],
+                    'module_name': bits[-3] if len(bits) > 2 else u'',
+                    'prefix': os.sep.join(bits[0:-3])
+                }))
             else:
-                possible.append(TestCaseInfo(basedir, method_prefix))
+                if self.name:
+                    echo.debug('name is ambiguous')
+                    possible.append(TestCaseInfo(basedir, method_prefix, **{
+                        'module_name': bits[-1],
+                        'prefix': os.sep.join(bits[0:-1])
+                    }))
+                    possible.append(TestCaseInfo(basedir, method_prefix, **{
+                        'method_name': bits[-1],
+                        'module_name': bits[-2] if len(bits) > 1 else u'',
+                        'prefix': os.sep.join(bits[0:-2])
+                    }))
+
+                else:
+                    possible.append(TestCaseInfo(basedir, method_prefix))
 
         self.possible = possible
 
@@ -386,7 +389,6 @@ def run_test(name, basedir, **kwargs):
         sys.stderr = TestResult.stderr_buffer
 
     tl = TestLoader(basedir)
-
     kwargs.setdefault('argv', ['run_test'])
     kwargs['argv'].append(name)
 
@@ -394,17 +396,20 @@ def run_test(name, basedir, **kwargs):
     kwargs.setdefault('testLoader', tl)
     kwargs.setdefault('testRunner', TestRunner)
 
+
     # https://docs.python.org/2/library/unittest.html#unittest.main
-    ret = unittest.main(**kwargs)
-    if len(ret.result.errors) or len(ret.result.failures):
-        ret_code = 1
+    try:
+        ret = unittest.main(**kwargs)
+        if len(ret.result.errors) or len(ret.result.failures):
+            ret_code = 1
 
-    elif not ret.result.testsRun:
-        ret_code = 1
+        elif not ret.result.testsRun:
+            ret_code = 1
 
-    if kwargs.get('buffer', False):
-        sys.stdout = TestResult.stdout_stream
-        sys.stderr = TestResult.stderr_stream
+    finally:
+        if kwargs.get('buffer', False):
+            sys.stdout = TestResult.stdout_stream
+            sys.stderr = TestResult.stderr_stream
 
     echo.debug('Test returned: {}', ret_code)
     return ret_code

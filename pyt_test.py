@@ -473,6 +473,35 @@ class TestInfoTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_testcase_not_found(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class FooTest(TestCase):",
+            "  def test_bar(self): pass"
+            "",
+            name="tests"
+        )
+
+        s = Client(m.cwd)
+
+        r = s.run('--all', code=1)
+        self.assertTrue(len(r) > 0)
+
+    def test_error_print_on_failure(self):
+        """tests weren't printing errors even on total failure, this makes sure
+        that's fixed"""
+        m = TestModule(
+            "from unittest import TestCase",
+            "import something_that_does_not_exist"
+            "",
+        )
+
+        s = Client(m.cwd)
+
+        r = s.run('--all', code=1)
+        self.assertTrue(len(r) > 0)
+
     def test_failfast(self):
         m = TestModule(
             "from unittest import TestCase",
