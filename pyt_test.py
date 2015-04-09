@@ -376,8 +376,9 @@ class TestModule(object):
         else:
             self.name = "prefix{}.pmod{}_test".format(testdata.get_ascii(5), testdata.get_ascii(5))
 
-        self.module_name = self.name.rsplit('.', 1)[1]
-        self.prefix = self.name.rsplit('.', 1)[0]
+        bits = self.name.rsplit('.', 1)
+        self.module_name = bits[1] if len(bits) == 2 else bits[0]
+        self.prefix = bits[0] if len(bits) == 2 else ''
 
         self.path = testdata.create_module(
             self.name,
@@ -474,19 +475,20 @@ class TestInfoTest(TestCase):
 
 class RunTestTest(TestCase):
     def test_testcase_not_found(self):
+        """ https://github.com/Jaymon/pyt/issues/1 """
         m = TestModule(
             "from unittest import TestCase",
             "",
-            "class FooTest(TestCase):",
-            "  def test_bar(self): pass"
+            "class BARTest(TestCase):",
+            "  def test_che(self): pass"
             "",
-            name="tests"
+            name="foo_test"
         )
 
         s = Client(m.cwd)
 
-        r = s.run('--all', code=1)
-        self.assertTrue(len(r) > 0)
+        r = s.run('foo_test.BARTest.test_che --no-buffer')
+        self.assertTrue('foo_test.BARTest.test_che' in r)
 
     def test_error_print_on_failure(self):
         """tests weren't printing errors even on total failure, this makes sure
@@ -624,7 +626,7 @@ class RunTestTest(TestCase):
 
         s = Client(m.cwd)
 
-        r = s.run('foo --debug')
+        r = s.run('foo --debug --no-buffer')
         self.assertTrue('Found module test: prefix_search.foo_test' in r)
         self.assertTrue('test_foo' not in r)
 
@@ -647,7 +649,7 @@ class RunTestTest(TestCase):
         )
 
         s = Client(cwd)
-        r = s.run('tint --debug')
+        r = s.run('tint --debug --no-buffer')
         self.assertEqual(1, r.count('Found module test'))
 
     def test_prefix_search(self):
@@ -668,13 +670,13 @@ class RunTestTest(TestCase):
 
         s = Client(m.cwd)
 
-        r = s.run('test_handshake --debug')
+        r = s.run('test_handshake --debug --no-buffer')
         self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
 
-        r = s.run('Bar.test_handshake --debug')
+        r = s.run('Bar.test_handshake --debug --no-buffer')
         self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
 
-        r = s.run('che --debug')
+        r = s.run('che --debug --no-buffer')
         self.assertTrue('Found module test: prefix_search.chebaz_test' in r)
 
         with self.assertRaises(RuntimeError):
