@@ -5,6 +5,7 @@ import os
 import ast
 import unittest
 from unittest import TestCase # to allow from pyt import TestCase, Assert
+from unittest.util import strclass
 #from unittest import TextTestRunner, TextTestResult
 import sys
 import inspect
@@ -230,7 +231,7 @@ class TestCaseInfo(object):
                 if module_regex.search(f):
                     filepath = os.path.join(root, f)
                     found = True
-                    echo.debug('module: {}', filepath)
+                    echo.debug('Module path: {}', filepath)
                     yield filepath
 
     def module_path(self, filepath):
@@ -264,6 +265,27 @@ class TestCaseInfo(object):
         return module_name
 
 
+class TestSuite(unittest.TestSuite):
+    def __len__(self):
+        count = 0
+        for test in self._tests:
+            if isinstance(test, type(self)):
+                count += len(test)
+            else:
+                count += 1
+        return count
+
+    def __str__(self):
+        lines = []
+        for test in self._tests:
+            if isinstance(test, type(self)):
+                lines.append(str(test))
+            else:
+                lines.append("{}.{}".format(strclass(test.__class__), test._testMethodName))
+
+        return "\n".join(lines)
+
+
 class TestLoader(unittest.TestLoader):
     """
     https://docs.python.org/2/library/unittest.html#unittest.TestLoader
@@ -271,6 +293,7 @@ class TestLoader(unittest.TestLoader):
     def __init__(self, basedir):
         super(TestLoader, self).__init__()
         self.basedir = self.normalize_dir(basedir)
+        self.suiteClass = TestSuite
 
     def normalize_dir(self, d):
         '''
@@ -288,18 +311,21 @@ class TestLoader(unittest.TestLoader):
         ti = TestInfo(name, self.basedir, self.testMethodPrefix)
         found = False
         for i, tc in enumerate(ti.possible, 1):
-            echo.debug("{}. Searching for test matching: {}", i, tc)
+            echo.debug("{}. Searching for tests matching:", i)
+            echo.debug("    {}", tc)
             if tc.has_method():
                 for c, mn in tc.method_names():
                     #echo.debug('adding test method to suite: {}', mn)
-                    echo.out('Found method test: {}.{}.{}', c.__module__, c.__name__, mn)
+                    #echo.out('Found method test: {}.{}.{}', c.__module__, c.__name__, mn)
+                    echo.out('Found method test: {}.{}', strclass(c), mn)
                     found = True
                     ts.addTest(c(mn))
 
             elif tc.has_class():
                 for c in tc.classes():
                     #echo.debug('adding testcase to suite: {}', c.__name__)
-                    echo.out('Found class test: {}.{}', c.__module__, c.__name__)
+                    #echo.out('Found class test: {}.{}', c.__module__, c.__name__)
+                    echo.out('Found class test: {}', strclass(c))
                     found = True
                     ts.addTest(self.loadTestsFromTestCase(c))
 
@@ -316,6 +342,7 @@ class TestLoader(unittest.TestLoader):
         if not found:
             ti.raise_any_error()
 
+        echo.debug("Found {} total tests".format(len(ts)))
         return ts
 
     def loadTestsFromNames(self, names, *args, **kwargs):
@@ -340,6 +367,14 @@ class TestResult(unittest.TextTestResult):
 
     stdout_buffer = StringIO()
     stderr_buffer = StringIO()
+
+    def startTest(self, test):
+        echo.debug("Starting {}.{}".format(strclass(test.__class__), test._testMethodName))
+        super(TestResult, self).startTest(test)
+
+    def stopTest(self, test):
+        echo.debug("\nStopping {}.{}".format(strclass(test.__class__), test._testMethodName))
+        super(TestResult, self).stopTest(test)
 
 #     def startTest(self, test):
 #         #pout.v('startTest')

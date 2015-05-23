@@ -18,62 +18,6 @@ from pyt import echo
 echo.DEBUG = True
 
 
-#def setUpModule():
-#    """
-#    set up the test module with a file structure to test finding different modules
-#
-#    basically, the idea of this folder structure is that /foo will have not be a submodule (no
-#    __init__.py file) but lots of other folders will be modules
-#    """
-#    # TODO -- switch over to use testdata instead of monkey patch
-#    return
-#    file_structure = [
-#        # root, dirs, files
-#        ('/foo', ['1', '2', 'test', 'bar', 'one'], []),
-#        ('/foo/1', [], ['__init__.py', 'one.py', 'two.PY']),
-#
-#        ('/foo/2', ['3'], ['__init__.py', 'three.py', 'four.py']),
-#        ('/foo/2/3', [], ['__init__.py', 'five.py', 'five_test.py']),
-#
-#        ('/foo/test', ['1', '2'], ['__init__.py']),
-#        ('/foo/test/1', [], ['__init__.py', 'one_test.py', 'testtwo.py']),
-#        ('/foo/test/2', [], ['__init__.py', 'threetest.py', 'test_four.py']),
-#
-#        ('/foo/bar', ['che'], []),
-#        ('/foo/bar/che', [], ['__init__.py', 'six_test.py']),
-#
-#        ('/foo/one', ['two'], []),
-#        ('/foo/one/two', ['three'], []),
-#        ('/foo/one/two/three', [], ['__init__.py', 'seven_test.py']),
-#    ]
-#
-#    test_modules = [
-#        '/foo/2/3/five_test.py',
-#        '/foo/test/1/one_test.py',
-#        '/foo/test/1/testtwo.py',
-#        '/foo/test/2/threetest.py',
-#        '/foo/test/2/test_four.py',
-#        '/foo/bar/che/six_test.py',
-#        '/foo/one/two/three/seven_test.py',
-#
-#    ]
-#
-#    all_files = list(test_modules)
-#    all_files.extend([
-#        '/foo/1/__init__.py',
-#        '/foo/2/__init__.py',
-#        '/foo/2/3/__init__.py',
-#        '/foo/test/__init__.py',
-#        '/foo/test/1/__init__.py',
-#        '/foo/test/2/__init__.py',
-#        '/foo/bar/che/__init__.py',
-#        '/foo/one/two/three/__init__.py',
-#    ])
-#
-#    pyt.os.walk = lambda *a, **kw: iter(file_structure)
-#    pyt.os.path.isfile = lambda f: (f in all_files)
-#
-
 class AssertTest(unittest.TestCase):
     def test_assertEqual(self):
         a = pyt.Assert(5)
@@ -374,11 +318,15 @@ class TestModule(object):
         if name:
             self.name = name
         else:
-            self.name = "prefix{}.pmod{}_test".format(testdata.get_ascii(5), testdata.get_ascii(5))
+            self.name = "prefix{}.pmod{}_test".format(
+                testdata.get_ascii(5),
+                testdata.get_ascii(5)
+            )
 
         bits = self.name.rsplit('.', 1)
         self.module_name = bits[1] if len(bits) == 2 else bits[0]
         self.prefix = bits[0] if len(bits) == 2 else ''
+        self.name_prefix = bits[1][:4] if len(bits) == 2 else bits[0][:4]
 
         self.path = testdata.create_module(
             self.name,
@@ -474,6 +422,38 @@ class TestInfoTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_debug(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class DebugTest(TestCase):",
+            "  def test_debug(self):",
+            "    print 'hi'",
+            "",
+            name="debug_test"
+        )
+
+        s = Client(m.cwd)
+
+        r = s.run('debug_test --no-buffer --debug')
+        pout.v(r)
+
+    def test_parse_error2(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class ParseErrorTest(TestCase):",
+            "  count = 5",
+            "  return",
+            "",
+            name="parse_error2_test"
+        )
+
+        s = Client(m.cwd)
+
+        with self.assertRaises(RuntimeError):
+            r = s.run('parse_error2_test')
+
     def test_testcase_not_found(self):
         """ https://github.com/Jaymon/pyt/issues/1 """
         m = TestModule(
@@ -585,7 +565,7 @@ class RunTestTest(TestCase):
             tmpdir=cwd
         )
 
-        ret_code = tester.run_test('clifoo', cwd)
+        ret_code = tester.run_test('cli_2.', cwd)
         self.assertEqual(0, ret_code)
 
         # if there is an error and no other test is found, bubble up the error
@@ -596,7 +576,7 @@ class RunTestTest(TestCase):
         )
 
         with self.assertRaises(ValueError):
-            ret_code = tester.run_test('pmod', m.cwd)
+            ret_code = tester.run_test(m.name_prefix, m.cwd)
 
     def test_cli(self):
         m = TestModule(
@@ -628,7 +608,6 @@ class RunTestTest(TestCase):
 
         r = s.run('foo --debug --no-buffer')
         self.assertTrue('Found module test: prefix_search.foo_test' in r)
-        self.assertTrue('test_foo' not in r)
 
     def test_ignore_non_test_modules(self):
         """make sure similar named non-test modules are ignored"""
@@ -692,6 +671,23 @@ class RunTestTest(TestCase):
 
         r = s.run('Bar --debug')
         self.assertTrue('FooBarTest' not in r)
+
+    def test_prefix_search2(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class FooBarTest(TestCase):",
+            "    def test_blah(self):",
+            "        pass",
+            name='ps2.foobar.chebaz_test'
+        )
+
+        s = Client(m.cwd)
+        ret_code = tester.run_test('foobar.', m.cwd)
+        self.assertEqual(0, ret_code)
+
+        ret_code = tester.run_test('ps2.', m.cwd)
+        self.assertEqual(0, ret_code)
 
     def test_setup(self):
         m = TestModule(
