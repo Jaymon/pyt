@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
+# https://docs.python.org/2/library/unittest.html
 import argparse
 import re
 import os
 import ast
 import unittest
-from unittest import TestCase # to allow from pyt import TestCase, Assert
+from unittest import TestCase # to allow "from pyt import TestCase, Assert"
 from unittest.util import strclass
 #from unittest import TextTestRunner, TextTestResult
 import sys
@@ -266,6 +267,7 @@ class TestCaseInfo(object):
         return module_name
 
 
+# https://hg.python.org/cpython/file/tip/Lib/unittest/suite.py
 class TestSuite(unittest.TestSuite):
     def __len__(self):
         count = 0
@@ -287,6 +289,7 @@ class TestSuite(unittest.TestSuite):
         return "\n".join(lines)
 
 
+# https://hg.python.org/cpython/file/648dcafa7e5f/Lib/unittest/loader.py
 class TestLoader(unittest.TestLoader):
     """
     https://docs.python.org/2/library/unittest.html#unittest.TestLoader
@@ -355,6 +358,7 @@ class TestLoader(unittest.TestLoader):
         return ts
 
 
+# https://hg.python.org/cpython/file/648dcafa7e5f/Lib/unittest/runner.py#l28
 class TestResult(unittest.TextTestResult):
     """
     This is overridden so I can keep original copies of stdout and stderr, and also
@@ -411,6 +415,7 @@ class TestResult(unittest.TextTestResult):
         self._stderr_buffer = self.stderr_buffer
 
 
+# https://hg.python.org/cpython/file/648dcafa7e5f/Lib/unittest/runner.py
 class TestRunner(unittest.TextTestRunner):
     """
     This sets our custom result class and also makes sure the stream that gets passed
