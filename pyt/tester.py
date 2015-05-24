@@ -13,6 +13,7 @@ import imp
 import importlib
 from contextlib import contextmanager
 from StringIO import StringIO
+import time
 
 from . import echo
 
@@ -369,12 +370,26 @@ class TestResult(unittest.TextTestResult):
     stderr_buffer = StringIO()
 
     def startTest(self, test):
+        self.pyt_test = test
         echo.debug("Starting {}.{}".format(strclass(test.__class__), test._testMethodName))
         super(TestResult, self).startTest(test)
 
-    def stopTest(self, test):
-        echo.debug("Stopping {}.{}".format(strclass(test.__class__), test._testMethodName))
-        super(TestResult, self).stopTest(test)
+    def startTestRun(self):
+        self.pyt_start = time.time()
+
+    def stopTestRun(self):
+        pyt_stop = time.time()
+        echo.debug("Stopping {}.{} after {}s".format(
+            strclass(self.pyt_test.__class__),
+            self.pyt_test._testMethodName,
+            round(pyt_stop - self.pyt_start, 2)
+        ))
+        del(self.pyt_start)
+        del(self.pyt_test)
+
+#     def stopTest(self, test):
+#         echo.debug("Stopping {}.{}".format(strclass(test.__class__), test._testMethodName))
+#         super(TestResult, self).stopTest(test)
 
 #     def startTest(self, test):
 #         #pout.v('startTest')
@@ -409,6 +424,11 @@ class TestRunner(unittest.TextTestRunner):
         if not stream:
             stream = self.resultclass.stderr_stream
         super(TestRunner, self).__init__(stream=stream, *args, **kwargs)
+
+#     def run(self, test):
+#         self.pyt_test = test
+#         return super(TestRunner, self).run(test)
+
 
 
 def run_test(name, basedir, **kwargs):
