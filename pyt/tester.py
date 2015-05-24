@@ -373,7 +373,7 @@ class TestResult(unittest.TextTestResult):
         super(TestResult, self).startTest(test)
 
     def stopTest(self, test):
-        echo.debug("\nStopping {}.{}".format(strclass(test.__class__), test._testMethodName))
+        echo.debug("Stopping {}.{}".format(strclass(test.__class__), test._testMethodName))
         super(TestResult, self).stopTest(test)
 
 #     def startTest(self, test):
