@@ -373,39 +373,34 @@ class TestResult(unittest.TextTestResult):
     stdout_buffer = StringIO()
     stderr_buffer = StringIO()
 
+    total_tests = 0
+
     def startTest(self, test):
-        self.pyt_test = test
-        echo.debug("Starting {}.{}".format(strclass(test.__class__), test._testMethodName))
+        """ran once before each TestCase"""
+        self._pyt_start = time.time()
+
+        echo.debug("{}/{} - Starting {}.{}".format(
+            self.testsRun + 1,
+            self.total_tests,
+            strclass(test.__class__),
+            test._testMethodName
+        ))
         super(TestResult, self).startTest(test)
 
-    def startTestRun(self):
-        self.pyt_start = time.time()
+    def stopTest(self, test):
+        """ran once after each TestCase"""
+        super(TestResult, self).stopTest(test)
 
-    def stopTestRun(self):
+        pyt_start = self._pyt_start
+        del(self._pyt_start)
+
         pyt_stop = time.time()
+
         echo.debug("Stopping {}.{} after {}s".format(
-            strclass(self.pyt_test.__class__),
-            self.pyt_test._testMethodName,
-            round(pyt_stop - self.pyt_start, 2)
+            strclass(test.__class__),
+            test._testMethodName,
+            round(pyt_stop - pyt_start, 2)
         ))
-        del(self.pyt_start)
-        del(self.pyt_test)
-
-#     def stopTest(self, test):
-#         echo.debug("Stopping {}.{}".format(strclass(test.__class__), test._testMethodName))
-#         super(TestResult, self).stopTest(test)
-
-#     def startTest(self, test):
-#         #pout.v('startTest')
-#         #pout.v("before start", id(sys.stdout), id(sys.stderr))
-#         super(TestResult, self).startTest(test)
-#         #pout.v("after start", id(sys.stdout), id(sys.stderr))
-
-#     def stopTest(self, test):
-#         #pout.v('stopTest')
-#         #pout.v("buffered stop", id(sys.stdout), id(sys.stderr))
-#         super(TestResult, self).stopTest(test)
-#         #pout.v("original stop", id(sys.stdout), id(sys.stderr))
 
     def __init__(self, *args, **kwargs):
         super(TestResult, self).__init__(*args, **kwargs)
@@ -430,10 +425,16 @@ class TestRunner(unittest.TextTestRunner):
             stream = self.resultclass.stderr_stream
         super(TestRunner, self).__init__(stream=stream, *args, **kwargs)
 
-#     def run(self, test):
-#         self.pyt_test = test
-#         return super(TestRunner, self).run(test)
+    def _makeResult(self):
+        instance = super(TestRunner, self)._makeResult()
+        instance.total_tests = len(self.running_test)
+        return instance
 
+    def run(self, test):
+        self.running_test = test
+        result = super(TestRunner, self).run(test)
+        self.running_test = None
+        return result
 
 
 def run_test(name, basedir, **kwargs):
@@ -455,7 +456,6 @@ def run_test(name, basedir, **kwargs):
     kwargs.setdefault('exit', False)
     kwargs.setdefault('testLoader', tl)
     kwargs.setdefault('testRunner', TestRunner)
-
 
     # https://docs.python.org/2/library/unittest.html#unittest.main
     try:

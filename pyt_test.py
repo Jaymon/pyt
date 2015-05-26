@@ -543,6 +543,53 @@ class RunTestTest(TestCase):
 
         ret_code = tester.run_test('Foo.bar', cwd)
 
+    def test_multi(self):
+        # if there is an error in one of the tests but another test is found, don't
+        # bubble up the error
+        cwd = testdata.create_dir()
+        testdata.create_modules(
+            {
+                'multi.bar_test': "\n".join([
+                    'from unittest import TestCase',
+                    '',
+                    'class BarTest(TestCase):',
+                    '    def test_bar(self): pass',
+                ]),
+                'multi.foo_test': "\n".join([
+                    'from unittest import TestCase',
+                    '',
+                    'class FooTest(TestCase):',
+                    '    def test_foo(self): pass',
+                    '',
+                    'class CheTest(TestCase):',
+                    '    def test_che(self): pass',
+                ])
+            },
+            tmpdir=cwd
+        )
+
+        ret_code = tester.run_test('multi.', cwd)
+        self.assertEqual(0, ret_code)
+
+    def test_no_tests_found(self):
+        # if there is an error in one of the tests but another test is found, don't
+        # bubble up the error
+        cwd = testdata.create_dir()
+        testdata.create_modules(
+            {
+                'nofound.nofo_test': "\n".join([
+                    'from unittest import TestCase',
+                    '',
+                    'class NofoTest(TestCase):',
+                    '    def test_nofo(self): pass',
+                ]),
+            },
+            tmpdir=cwd
+        )
+
+        ret_code = tester.run_test('nofound_does_not_exist.', cwd)
+        self.assertEqual(1, ret_code)
+
     def test_cli_errors(self):
         # if there is an error in one of the tests but another test is found, don't
         # bubble up the error
