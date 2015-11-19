@@ -4,7 +4,6 @@ Easy python testing for Python's unittest module.
 
 Pyt's goal is to make writing and running Python unit tests fun and easy.
 
-Currently, there are two main components, the `pyt` command line test runner, and the `Assert` class
 
 ## pyt testrunner
 
@@ -27,6 +26,7 @@ With `pyt`, I just need to remember what I'm working on:
     $ pyt Happy.sad
 
 and `pyt` will do the rest, it will check every test module it finds in the working directory and see if it has a Happy test case with a `test_sad` method. No more having to remember the unittest syntax, and no more typing long test paths. Hopefully, if tests are easy to run, I'll write more of them.
+
 
 ### More examples
 
@@ -51,13 +51,28 @@ To run every test `pyt` can find:
 
 ### Things to be aware of
 
-#### pyt uses Python's [PEP 8](http://www.python.org/dev/peps/pep-0008/) style conventions
+#### pyt uses Python's PEP 8 style conventions
 
-`pyt` uses PEP 8 to decide what is the module and class, so, given input like this:
+`pyt` uses [PEP 8](http://www.python.org/dev/peps/pep-0008/) to decide what is the module and class, so, given input like this:
 
     $ pyt foo.bar.Baz.che
 
 `pyt` will consider `foo.bar` to be modules, `Baz` to be a class because it starts with a capital letter, and `che` to be a method since it comes after a class.
+
+
+#### pyt turns on buffering and failfast by default
+
+This is the opposite of Python's normal unittest behavior, you can turn them off with `--no-buffer` and `--no-failfast` flags, respectively.
+
+The `--debug` flag is really handy, it will print out each test that pyt runs and how long it took to run it, and how many tests it will run in total.
+
+
+#### See all flags
+
+To see everything pyt can do
+
+    $ pyt --help
+
 
 #### Vague input can cause pyt to run more tests than you expect
 
@@ -86,6 +101,8 @@ it will run both `tests/user_test` and `tests.foo.user_test`, the solution is to
 
 
 ## pyt Assert
+
+Truthfully, this was more a thought experiment than anything else, I currently have *ZERO* tests that use this syntax in any codebase I maintain, so this might be removed at some future time.
 
 This is a helper class designed to make writing assert statements in your test cases a lot more fluid:
 

@@ -8,12 +8,11 @@ from unittest import TestCase # to allow from pyt import TestCase, Assert
 import sys
 import inspect
 
-from assertion import Assert
 from . import tester
 from . import echo
 
 
-__version__ = '0.7.11'
+__version__ = '0.7.12'
 
 def console():
     '''
