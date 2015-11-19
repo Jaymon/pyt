@@ -100,65 +100,6 @@ it will run both `tests/user_test` and `tests.foo.user_test`, the solution is to
     $ pyt foo.user
 
 
-## pyt Assert
-
-Truthfully, this was more a thought experiment than anything else, I currently have *ZERO* tests that use this syntax in any codebase I maintain, so this might be removed at some future time.
-
-This is a helper class designed to make writing assert statements in your test cases a lot more fluid:
-
-```python
-from pyt import Assert
-
-v = 5
-a = Assert(v)
-
-a == 5 # assertEqual(v, 5)
-a != 5 # assertNotEqual(v, 5)
-a > 5 # assertGreater(v, 5)
-a >= 5 # assertGreaterEqual(v, 5)
-a < 5 # assertLess(v, 5)
-a <= 5 # assertLessEqual(v, 5)
-+a # self.assertGreater(v, 0)
--a # self.assertLess(v, 0)
-~a # self.assertNotEqual(v, 0)
-
-v = "foobar"
-a = Assert(v)
-
-"foo" in a # assertIn("foo", v)
-"foo not in a # assertNotIn("foo", v)
-
-a % str # assertIsInstance(v, str)
-a % (str, unicode) # to use multiple, put them in a tuple
-a ^ str # assertNotIsInstance(v, str)
-
-a / regex # assertRegexpMatches(v, re)
-a // regex # assertNotRegexpMatches(v, re)
-
-# assertRaises(ValueError)
-with Assert(ValueError): 
-    raise ValueError("boom")
-
-a == False # assertFalse(v)
-a == True # assertTrue(v)
-
-a * 'foo', 'bar' # assert foo and bar are keys/attributes in v
-a ** {...} # assert v has all keys and values in dict
-
-a *= 'foo', 'bar' # assert foo and bar are the only keys in v
-a **= {...} # assert v has only the keys and values in dict
-
-a.len == 5 # assertEqual(len(v), 5)
-
-# it even works on attributes and methods of objects
-o = SomeObject()
-o.foo = 1
-a = Assert(o)
-a.foo == 1
-a.bar() == "bar return value"
-```
-
-
 ## Installation
 
 Use `pip`:
