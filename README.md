@@ -100,6 +100,11 @@ it will run both `tests/user_test` and `tests.foo.user_test`, the solution is to
     $ pyt foo.user
 
 
+#### Environment Variables
+
+If you are running the tests within pyt, you might notice there is an environment variable `PYT_TEST_COUNT` that contains the count of how many tests pyt found to run.
+
+
 ## Installation
 
 Use `pip`:

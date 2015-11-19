@@ -8,12 +8,15 @@ import testdata
 
 # remove any global pyt
 if 'pyt' in sys.modules:
-    sys.modules['__pyt_old'] = sys.modules['pyt']
-    del sys.modules['pyt']
+    for k in sys.modules.keys():
+        if k.startswith("pyt."):
+            sys.modules.pop(k)
+
 
 import pyt
 from pyt import tester
 from pyt import echo
+
 
 echo.DEBUG = True
 
@@ -193,6 +196,36 @@ class TestInfoTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_environ(self):
+        m = TestModule(
+            "import os",
+            "from unittest import TestCase",
+            "",
+            "class BarTest(TestCase):",
+            "    def test_bar(self):",
+            "        if int(os.environ['PYT_TEST_COUNT']) == 1:",
+            "            raise ValueError('test count 1')",
+            "",
+            "class FooTest(TestCase):",
+            "    def test_foo(self):",
+            "        if int(os.environ['PYT_TEST_COUNT']) == 2:",
+            "            raise ValueError('test count 2')",
+            "",
+            "    def test_che(self):",
+            "        pass",
+        )
+
+        s = Client(m.cwd)
+
+        with self.assertRaises(RuntimeError):
+            r = s.run('Bar --debug --no-buffer')
+
+        with self.assertRaises(RuntimeError):
+            r = s.run('Foo --debug --no-buffer')
+
+        r = s.run('pmod --debug')
+
+
     def test_debug(self):
         m = TestModule(
             "from unittest import TestCase",

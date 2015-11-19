@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
 # https://docs.python.org/2/library/unittest.html
-import argparse
 import re
 import os
-import ast
 import unittest
-from unittest import TestCase # to allow "from pyt import TestCase, Assert"
 from unittest.util import strclass
-#from unittest import TextTestRunner, TextTestResult
 import sys
 import inspect
-import imp
 import importlib
-from contextlib import contextmanager
 from StringIO import StringIO
 import time
 
@@ -122,14 +116,13 @@ class TestCaseInfo(object):
 
     def modules(self):
         """return modules that match module_name"""
-        # this is a hack, I couldn't get imp.load_source to work right
+        # this is a hack because I couldn't get imp.load_source to work right
         sys.path.insert(0, self.basedir)
         for p in self.paths():
             # http://stackoverflow.com/questions/67631/
             try:
                 module_name = self.module_path(p)
                 m = importlib.import_module(module_name)
-                #m = imp.load_source(module_name, p)
                 yield m
 
             except Exception, e:
@@ -269,14 +262,14 @@ class TestCaseInfo(object):
 
 # https://hg.python.org/cpython/file/tip/Lib/unittest/suite.py
 class TestSuite(unittest.TestSuite):
-    def __len__(self):
-        count = 0
-        for test in self._tests:
-            if isinstance(test, type(self)):
-                count += len(test)
-            else:
-                count += 1
-        return count
+#     def __len__(self):
+#         count = 0
+#         for test in self._tests:
+#             if isinstance(test, type(self)):
+#                 count += len(test)
+#             else:
+#                 count += 1
+#         return count
 
     def __str__(self):
         lines = []
@@ -346,7 +339,7 @@ class TestLoader(unittest.TestLoader):
         if not found:
             ti.raise_any_error()
 
-        echo.debug("Found {} total tests".format(len(ts)))
+        echo.debug("Found {} total tests".format(ts.countTestCases()))
         return ts
 
     def loadTestsFromNames(self, names, *args, **kwargs):
@@ -427,7 +420,12 @@ class TestRunner(unittest.TextTestRunner):
 
     def _makeResult(self):
         instance = super(TestRunner, self)._makeResult()
-        instance.total_tests = len(self.running_test)
+        instance.total_tests = self.running_test.countTestCases()
+
+        # not sure how much I love messing with the environment right here, but this
+        # does propagate down to the test cases
+        os.environ['PYT_TEST_COUNT'] = str(instance.total_tests)
+
         return instance
 
     def run(self, test):
@@ -450,6 +448,7 @@ def run_test(name, basedir, **kwargs):
         sys.stderr = TestResult.stderr_buffer
 
     tl = TestLoader(basedir)
+
     kwargs.setdefault('argv', ['run_test'])
     kwargs['argv'].append(name)
 
