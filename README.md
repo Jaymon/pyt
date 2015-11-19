@@ -53,11 +53,13 @@ To run every test `pyt` can find:
 
 #### pyt uses Python's PEP 8 style conventions
 
-`pyt` uses [PEP 8](http://www.python.org/dev/peps/pep-0008/) to decide what is the module and class, so, given input like this:
+`pyt` uses [PEP8](http://www.python.org/dev/peps/pep-0008/) to decide what is the module and class, so, given input like this:
 
     $ pyt foo.bar.Baz.che
 
-`pyt` will consider `foo.bar` to be modules, `Baz` to be a class because it starts with a capital letter, and `che` to be a method since it comes after a class.
+`pyt` will consider `foo.bar` to be the module, `Baz` to be a class because it starts with a capital letter, and `che` to be a method since it comes after a class.
+
+Likewise, `pyt` uses unittest conventions, so a test module should end with `_test` (eg, `foo.bar_test`) and a TestCase class should end with either `Test` or `TestCase` (eg, `BazTest`), and test methods should start with `test_` (eg, `test_che`).
 
 
 #### pyt turns on buffering and failfast by default
