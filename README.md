@@ -2,7 +2,7 @@
 
 Easy python testing for Python's unittest module.
 
-Pyt's goal is to make writing and running Python unit tests fun and easy.
+Pyt's goal is to make running Python unit tests fun and easy.
 
 
 ## pyt testrunner
@@ -53,7 +53,7 @@ To run every test `pyt` can find:
 
 #### pyt uses Python's PEP 8 style conventions
 
-`pyt` uses [PEP8](http://www.python.org/dev/peps/pep-0008/) to decide what is the module and class, so, given input like this:
+`pyt` uses [Python's code styling conventions](http://www.python.org/dev/peps/pep-0008/) to decide what is the module and class, so, given input like this:
 
     $ pyt foo.bar.Baz.che
 
