@@ -49,7 +49,7 @@ class Client(object):
                 r += char
 
             if process.returncode != expected_ret_code:
-                raise RuntimeError("cmd returned {} with output".format(process.returncode, r))
+                raise RuntimeError("cmd returned {} with output: {}".format(process.returncode, r))
 
         except subprocess.CalledProcessError, e:
             raise RuntimeError("cmd returned {} with output: {}".format(e.returncode, e.output))
@@ -196,6 +196,47 @@ class TestInfoTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_buffer(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BarTest(TestCase):",
+            "    def test_bar(self):",
+            "        print 'in bar test'",
+            "",
+        )
+
+        s = Client(m.cwd)
+        r = s.run("pmod")
+        self.assertFalse("in bar test" in r)
+
+        r = s.run("pmod.Bar.bar")
+        self.assertTrue("in bar test" in r)
+
+        r = s.run("pmod.Bar.bar --buffer")
+        self.assertFalse("in bar test" in r)
+
+        r = s.run("pmod.Bar")
+        self.assertFalse("in bar test" in r)
+
+        r = s.run("pmod.Bar --no-buffer")
+        self.assertTrue("in bar test" in r)
+
+
+    def test_package(self):
+        m = testdata.create_package("foo_test", [
+            "from unittest import TestCase",
+            "class FooTest(TestCase):",
+            "    def test_foo(self):",
+            "        print 'in foo test'",
+            "",
+        ])
+
+        s = Client(m.basedir)
+        r = s.run("foo_test --no-buffer")
+        self.assertTrue("in foo test" in r)
+
+
     def test_environ(self):
         m = TestModule(
             "import os",

@@ -21,8 +21,9 @@ def console():
     parser.add_argument('--all', dest='run_all', action='store_true', help='run all tests if no NAME specified')
 
     # https://docs.python.org/2/library/unittest.html#command-line-options
-    parser.add_argument('--no-failfast', dest='not_failfast', action='store_false', help='turns off fail fast')
-    parser.add_argument('--no-buffer', dest='not_buffer', action='store_false', help='turns off buffer')
+    parser.add_argument('--no-failfast', dest='no_failfast', action='store_true', help='turns off fail fast')
+    parser.add_argument('--no-buffer', dest='no_buffer', action='store_true', help='turns off buffer')
+    parser.add_argument('--buffer', dest='buffer', action='store_true', help='turns on buffer')
 
     args, test_args = parser.parse_known_args()
 
@@ -30,6 +31,8 @@ def console():
 
     test_args.insert(0, sys.argv[0])
     ret_code = 0
+
+    environ = tester.TestEnviron(args)
 
     if not args.names:
         if args.run_all:
@@ -41,8 +44,7 @@ def console():
                 name,
                 args.basedir,
                 argv=test_args,
-                failfast=args.not_failfast,
-                buffer=args.not_buffer,
+                environ=environ
             )
 
     else:

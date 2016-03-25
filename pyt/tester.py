@@ -9,8 +9,47 @@ import inspect
 import importlib
 from StringIO import StringIO
 import time
+from collections import Counter
 
 from . import echo
+
+
+class TestEnviron(object):
+    stdout_stream = sys.stdout
+    stderr_stream = sys.stderr
+
+    stdout_buffer = StringIO()
+    stderr_buffer = StringIO()
+
+    def __init__(self, args):
+        self.args = args
+        self.init_buf()
+        self.counter = Counter()
+
+    def init_buf(self):
+        if self.args.buffer or not self.args.no_buffer:
+            sys.stdout = self.stdout_buffer
+            sys.stderr = self.stderr_buffer
+
+    def unbuffer(self):
+        if sys.stdout is not self.stdout_stream:
+            sys.stdout = self.stdout_stream
+
+        if sys.stderr is not self.stderr_stream:
+            sys.stderr = self.stderr_stream
+
+    def unbuffer_if_one_test(self):
+        if self.counter["methods"] == 1 and len(self.counter) == 1:
+            if not self.args.buffer:
+                self.unbuffer()
+
+    def update_env_for_test(self, test_count):
+        # not sure how much I love messing with the environment right here, but this
+        # does propagate down to the test cases
+        os.environ['PYT_TEST_COUNT'] = str(test_count)
+        os.environ['PYT_TEST_METHOD_COUNT'] = str(self.counter["methods"])
+        os.environ['PYT_TEST_CLASS_COUNT'] = str(self.counter["classes"])
+        os.environ['PYT_TEST_MODULE_COUNT'] = str(self.counter["modules"])
 
 
 class TestInfo(object):
@@ -196,10 +235,15 @@ class TestCaseInfo(object):
 
         found = False
         module_regex = ''
+        package_regex = ''
         if module_name:
             if module_name.startswith('test') or module_name.endswith('test'):
                 module_regex = re.compile(
                     ur'^{}\.py$'.format(module_name),
+                    re.I
+                )
+                package_regex = re.compile(
+                    ur'^{}$'.format(module_name),
                     re.I
                 )
 
@@ -208,9 +252,14 @@ class TestCaseInfo(object):
                     ur'^(?:test_?{}|{}.*?_?test)\.py$'.format(module_name, module_name),
                     re.I
                 )
+                package_regex = re.compile(
+                    ur'^(?:test_?{}|{}.*?_?test)$'.format(module_name, module_name),
+                    re.I
+                )
 
         else:
             module_regex = re.compile(ur'^(?:test\S+|\S+test)\.py$', re.I)
+            package_regex = re.compile(ur'^(?:test\S+|\S+test)$', re.I)
 
         prefix_regex = ''
         if module_prefix:
@@ -223,11 +272,12 @@ class TestCaseInfo(object):
                 if not prefix_regex.search(root): continue
 
             for f in files:
-                if module_regex.search(f):
+                if module_regex.search(f) or (f.startswith("__init__") and package_regex.search(os.path.basename(root))):
                     filepath = os.path.join(root, f)
                     found = True
                     echo.debug('Module path: {}', filepath)
                     yield filepath
+
 
     def module_path(self, filepath):
         """given a filepath like /base/path/to/module.py this will convert it to
@@ -240,7 +290,7 @@ class TestCaseInfo(object):
         modules = re.split('[\\/]', module_name)
         module_count = len(modules)
         if module_count > 1:
-            for x in xrange(module_count):
+            for x in range(module_count):
                 path_args = [basedir]
                 path_args.extend(modules[0:x + 1])
                 path_args.append(u'__init__.py')
@@ -256,7 +306,7 @@ class TestCaseInfo(object):
             module_name = u'.'.join(modules[x:])
 
         # convert the remaining file path to a python module path that can be imported
-        module_name = re.sub(ur'.py$', u'', module_name, flags=re.I)
+        module_name = re.sub(ur'(?:\.__init__)?\.py$', u'', module_name, flags=re.I)
         return module_name
 
 
@@ -287,10 +337,11 @@ class TestLoader(unittest.TestLoader):
     """
     https://docs.python.org/2/library/unittest.html#unittest.TestLoader
     """
-    def __init__(self, basedir):
+    def __init__(self, basedir, environ):
         super(TestLoader, self).__init__()
         self.basedir = self.normalize_dir(basedir)
         self.suiteClass = TestSuite
+        self.environ = environ
 
     def normalize_dir(self, d):
         '''
@@ -317,6 +368,7 @@ class TestLoader(unittest.TestLoader):
                     echo.out('Found method test: {}.{}', strclass(c), mn)
                     found = True
                     ts.addTest(c(mn))
+                    self.environ.counter["methods"] += 1
 
             elif tc.has_class():
                 for c in tc.classes():
@@ -325,6 +377,7 @@ class TestLoader(unittest.TestLoader):
                     echo.out('Found class test: {}', strclass(c))
                     found = True
                     ts.addTest(self.loadTestsFromTestCase(c))
+                    self.environ.counter["classes"] += 1
 
             else:
                 for m in tc.modules():
@@ -332,6 +385,7 @@ class TestLoader(unittest.TestLoader):
                     echo.out('Found module test: {}', m.__name__)
                     found = True
                     ts.addTest(self.loadTestsFromModule(m))
+                    self.environ.counter["modules"] += 1
 
                 # if we found a module that matched then don't try for method
                 if found: break
@@ -340,6 +394,7 @@ class TestLoader(unittest.TestLoader):
             ti.raise_any_error()
 
         echo.debug("Found {} total tests".format(ts.countTestCases()))
+        self.environ.unbuffer_if_one_test()
         return ts
 
     def loadTestsFromNames(self, names, *args, **kwargs):
@@ -360,12 +415,6 @@ class TestResult(unittest.TextTestResult):
     all the testing modules before unittest had a chance to buffer them, so they would
     have real references to stdout/stderr and would still print out all the logging.
     """
-    stdout_stream = sys.stdout
-    stderr_stream = sys.stderr
-
-    stdout_buffer = StringIO()
-    stderr_buffer = StringIO()
-
     total_tests = 0
 
     def startTest(self, test):
@@ -397,10 +446,10 @@ class TestResult(unittest.TextTestResult):
 
     def __init__(self, *args, **kwargs):
         super(TestResult, self).__init__(*args, **kwargs)
-        self._original_stdout = self.stdout_stream
-        self._original_stderr = self.stderr_stream
-        self._stdout_buffer = self.stdout_buffer
-        self._stderr_buffer = self.stderr_buffer
+        self._original_stdout = TestEnviron.stdout_stream
+        self._original_stderr = TestEnviron.stderr_stream
+        self._stdout_buffer = TestEnviron.stdout_buffer
+        self._stderr_buffer = TestEnviron.stderr_buffer
 
 
 # https://hg.python.org/cpython/file/648dcafa7e5f/Lib/unittest/runner.py
@@ -413,19 +462,25 @@ class TestRunner(unittest.TextTestRunner):
     """
     resultclass = TestResult
 
-    def __init__(self, stream=None, *args, **kwargs):
-        if not stream:
-            stream = self.resultclass.stderr_stream
-        super(TestRunner, self).__init__(stream=stream, *args, **kwargs)
+    def __init__(self, environ, *args, **kwargs):
+        self.environ = environ
+        stream = environ.stderr_stream
+        super(TestRunner, self).__init__(
+            stream=stream,
+            failfast=not environ.args.no_failfast,
+            *args,
+            **kwargs
+        )
+
+#     def __init__(self, stream=None, *args, **kwargs):
+#         if not stream:
+#             stream = self.resultclass.stderr_stream
+#         super(TestRunner, self).__init__(stream=stream, *args, **kwargs)
 
     def _makeResult(self):
         instance = super(TestRunner, self)._makeResult()
         instance.total_tests = self.running_test.countTestCases()
-
-        # not sure how much I love messing with the environment right here, but this
-        # does propagate down to the test cases
-        os.environ['PYT_TEST_COUNT'] = str(instance.total_tests)
-
+        self.environ.update_env_for_test(instance.total_tests)
         return instance
 
     def run(self, test):
@@ -435,7 +490,7 @@ class TestRunner(unittest.TextTestRunner):
         return result
 
 
-def run_test(name, basedir, **kwargs):
+def run_test(name, basedir, environ, **kwargs):
     '''
     run the test found with find_test() with unittest
 
@@ -443,18 +498,16 @@ def run_test(name, basedir, **kwargs):
     '''
     ret_code = 0
 
-    if kwargs.get('buffer', False):
-        sys.stdout = TestResult.stdout_buffer
-        sys.stderr = TestResult.stderr_buffer
-
-    tl = TestLoader(basedir)
+    tl = TestLoader(basedir, environ)
+    tr = TestRunner(environ)
 
     kwargs.setdefault('argv', ['run_test'])
     kwargs['argv'].append(name)
 
     kwargs.setdefault('exit', False)
     kwargs.setdefault('testLoader', tl)
-    kwargs.setdefault('testRunner', TestRunner)
+    #kwargs.setdefault('testRunner', TestRunner)
+    kwargs.setdefault('testRunner', tr)
 
     # https://docs.python.org/2/library/unittest.html#unittest.main
     try:
@@ -465,12 +518,11 @@ def run_test(name, basedir, **kwargs):
         elif not ret.result.testsRun:
             ret_code = 1
 
-    finally:
-        if kwargs.get('buffer', False):
-            sys.stdout = TestResult.stdout_stream
-            sys.stderr = TestResult.stderr_stream
+        echo.debug('Test returned: {}', ret_code)
 
-    echo.debug('Test returned: {}', ret_code)
+    finally:
+        environ.unbuffer()
+
     return ret_code
 
 

@@ -118,15 +118,7 @@ You can also get it directly from the repo:
     $ pip install git+https://github.com/Jaymon/pyt#egg=pyt
 
 
-## TODO
+## License
 
-#### Glob support?
-
-add support for globs. Pyt already does prefix searching, but if you wanted to match anything in front:
-
-    pyt mod.Foo.*bar
-
-#### Tests don't run in windows
-
-I used `/` in the tests, and `os.sep` in all the pyt stuff, so it runs on windows, it just doesn't pass the tests :(
+MIT
 
