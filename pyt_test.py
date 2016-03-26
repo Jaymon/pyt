@@ -66,7 +66,7 @@ class TestModule(object):
 
     @property
     def tl(self):
-        tl = tester.TestLoader(self.cwd)
+        tl = tester.TestLoader(self.cwd, tester.TestEnviron())
         return tl
 
     @property
@@ -168,6 +168,13 @@ class TestCaseInfoTest(TestCase):
 
 
 class TestInfoTest(TestCase):
+    def test_filename(self):
+        ti = tester.TestInfo("foo/bar/che.py", '/tmp')
+        self.assertEqual("/tmp/foo/bar/che.py", list(ti.possible[0].paths())[0])
+
+        ti = tester.TestInfo("/foo/bar/che.py", '/tmp')
+        self.assertEqual("/foo/bar/che.py", list(ti.possible[0].paths())[0])
+
     def test_set_possible(self):
         tests = (
             ('foo.bar', [{'module_name': 'bar', 'prefix': 'foo'}, {'method_name': 'bar', 'module_name': 'foo', 'prefix': ''}]),
@@ -183,15 +190,13 @@ class TestInfoTest(TestCase):
 
         for test_in, test_out in tests:
             ti = tester.TestInfo(test_in, '/tmp')
-            ti.set_possible()
             for i, to in enumerate(test_out):
-                for k, v in to.iteritems():
+                for k, v in to.items():
                     r = getattr(ti.possible[i], k)
                     self.assertEqual(v, r)
 
     def test_no_name(self):
         ti = tester.TestInfo('', '/tmp')
-        ti.set_possible()
         self.assertEqual(1, len(ti.possible))
 
 
@@ -222,6 +227,22 @@ class RunTestTest(TestCase):
         r = s.run("pmod.Bar --no-buffer")
         self.assertTrue("in bar test" in r)
 
+    def test_filepath(self):
+        m = testdata.create_module("bar.foo_test", [
+            "from unittest import TestCase",
+            "class FooTest(TestCase):",
+            "    def test_foo(self):",
+            "        pass",
+            #"        print 'in foo test'",
+            "",
+        ])
+
+        s = Client(m.basedir)
+        s.run("{}".format(m.module.__file__))
+        s.run("{}:Foo".format(m.module.__file__))
+        s.run("{}:Foo.foo".format(m.module.__file__))
+        with self.assertRaises(RuntimeError):
+            s.run("{}:Bah".format(m.module.__file__))
 
     def test_package(self):
         m = testdata.create_package("foo_test", [
@@ -235,7 +256,6 @@ class RunTestTest(TestCase):
         s = Client(m.basedir)
         r = s.run("foo_test --no-buffer")
         self.assertTrue("in foo test" in r)
-
 
     def test_environ(self):
         m = TestModule(

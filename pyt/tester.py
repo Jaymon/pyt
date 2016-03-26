@@ -21,13 +21,21 @@ class TestEnviron(object):
     stdout_buffer = StringIO()
     stderr_buffer = StringIO()
 
-    def __init__(self, args):
+    def __init__(self, args=None):
+        self.buffer = False
+        self.no_buffer = False
+        self.no_failfast = False
         self.args = args
+        if args:
+            self.no_failfast = args.no_failfast
+            self.no_buffer = args.no_buffer
+            self.buffer = args.buffer
+
         self.init_buf()
         self.counter = Counter()
 
     def init_buf(self):
-        if self.args.buffer or not self.args.no_buffer:
+        if self.buffer or not self.no_buffer:
             sys.stdout = self.stdout_buffer
             sys.stderr = self.stderr_buffer
 
@@ -40,7 +48,7 @@ class TestEnviron(object):
 
     def unbuffer_if_one_test(self):
         if self.counter["methods"] == 1 and len(self.counter) == 1:
-            if not self.args.buffer:
+            if not self.buffer:
                 self.unbuffer()
 
     def update_env_for_test(self, test_count):
@@ -73,48 +81,56 @@ class TestInfo(object):
         return -- list -- a list of possible interpretations of the module path
             (eg, foo.bar can be bar module in foo module, or bar method in foo module)
         '''
-        if ':' in self.name or os.sep in self.name:
-            # TODO: add support for path/something:Class.method
-            #filepath, method_path = self.name.split(":", 1)
-            pass
+        possible = []
+        name = self.name
+        name_f = self.name.lower()
+        filepath = ""
+        if name_f.endswith(".py") or ".py:" in name_f:
+            # path/something:Class.method
+            bits = name.split(":", 1)
+            filepath = bits[0]
+            name = bits[1] if len(bits) > 1 else ""
+            echo.debug('Found filepath: {}', filepath)
 
+        bits = name.split(u'.')
+        basedir = self.basedir
+        method_prefix = self.method_prefix
+
+        # check if the last bit is a Class
+        if re.search(ur'^[A-Z]', bits[-1]):
+            echo.debug('Found class in name: {}', bits[-1])
+            possible.append(TestCaseInfo(basedir, method_prefix, **{
+                'class_name': bits[-1],
+                'module_name': bits[-2] if len(bits) > 1 else u'',
+                'prefix': os.sep.join(bits[0:-2]),
+                'filepath': filepath,
+            }))
+        elif len(bits) > 1 and re.search(ur'^[A-Z]', bits[-2]):
+            echo.debug('Found class in name: {}', bits[-2])
+            possible.append(TestCaseInfo(basedir, method_prefix, **{
+                'class_name': bits[-2],
+                'method_name': bits[-1],
+                'module_name': bits[-3] if len(bits) > 2 else u'',
+                'prefix': os.sep.join(bits[0:-3]),
+                'filepath': filepath,
+            }))
         else:
-            bits = self.name.split(u'.')
-            basedir = self.basedir
-            possible = []
-            method_prefix = self.method_prefix
-
-            # check if the last bit is a Class
-            if re.search(ur'^[A-Z]', bits[-1]):
-                echo.debug('Found class in name: {}', bits[-1])
+            if self.name:
+                echo.debug('name is ambiguous')
                 possible.append(TestCaseInfo(basedir, method_prefix, **{
-                    'class_name': bits[-1],
-                    'module_name': bits[-2] if len(bits) > 1 else u'',
-                    'prefix': os.sep.join(bits[0:-2])
+                    'module_name': bits[-1],
+                    'prefix': os.sep.join(bits[0:-1]),
+                    'filepath': filepath,
                 }))
-            elif len(bits) > 1 and re.search(ur'^[A-Z]', bits[-2]):
-                echo.debug('Found class in name: {}', bits[-2])
                 possible.append(TestCaseInfo(basedir, method_prefix, **{
-                    'class_name': bits[-2],
                     'method_name': bits[-1],
-                    'module_name': bits[-3] if len(bits) > 2 else u'',
-                    'prefix': os.sep.join(bits[0:-3])
+                    'module_name': bits[-2] if len(bits) > 1 else u'',
+                    'prefix': os.sep.join(bits[0:-2]),
+                    'filepath': filepath,
                 }))
-            else:
-                if self.name:
-                    echo.debug('name is ambiguous')
-                    possible.append(TestCaseInfo(basedir, method_prefix, **{
-                        'module_name': bits[-1],
-                        'prefix': os.sep.join(bits[0:-1])
-                    }))
-                    possible.append(TestCaseInfo(basedir, method_prefix, **{
-                        'method_name': bits[-1],
-                        'module_name': bits[-2] if len(bits) > 1 else u'',
-                        'prefix': os.sep.join(bits[0:-2])
-                    }))
 
-                else:
-                    possible.append(TestCaseInfo(basedir, method_prefix))
+            else:
+                possible.append(TestCaseInfo(basedir, method_prefix, filepath=filepath))
 
         self.possible = possible
 
@@ -232,51 +248,58 @@ class TestCaseInfo(object):
         module_name = getattr(self, 'module_name', u'')
         module_prefix = getattr(self, 'prefix', u'')
         basedir = self.basedir
+        filepath = getattr(self, 'filepath', u'')
 
-        found = False
-        module_regex = ''
-        package_regex = ''
-        if module_name:
-            if module_name.startswith('test') or module_name.endswith('test'):
-                module_regex = re.compile(
-                    ur'^{}\.py$'.format(module_name),
-                    re.I
-                )
-                package_regex = re.compile(
-                    ur'^{}$'.format(module_name),
-                    re.I
-                )
+        if filepath:
+            if os.path.isabs(filepath):
+                yield filepath
 
             else:
-                module_regex = re.compile(
-                    ur'^(?:test_?{}|{}.*?_?test)\.py$'.format(module_name, module_name),
-                    re.I
-                )
-                package_regex = re.compile(
-                    ur'^(?:test_?{}|{}.*?_?test)$'.format(module_name, module_name),
-                    re.I
-                )
+                yield os.path.join(basedir, filepath)
 
         else:
-            module_regex = re.compile(ur'^(?:test\S+|\S+test)\.py$', re.I)
-            package_regex = re.compile(ur'^(?:test\S+|\S+test)$', re.I)
+            module_regex = ''
+            package_regex = ''
+            if module_name:
+                if module_name.startswith('test') or module_name.endswith('test'):
+                    module_regex = re.compile(
+                        ur'^{}\.py$'.format(module_name),
+                        re.I
+                    )
+                    package_regex = re.compile(
+                        ur'^{}$'.format(module_name),
+                        re.I
+                    )
 
-        prefix_regex = ''
-        if module_prefix:
-            #prefix_regex = re.compile(module_prefix.replace('.', '[\\/]'), re.I)
-            prefix_regex = re.compile(module_prefix, re.I)
+                else:
+                    module_regex = re.compile(
+                        ur'^(?:test_?{}|{}.*?_?test)\.py$'.format(module_name, module_name),
+                        re.I
+                    )
+                    package_regex = re.compile(
+                        ur'^(?:test_?{}|{}.*?_?test)$'.format(module_name, module_name),
+                        re.I
+                    )
 
-        for root, dirs, files in os.walk(basedir, topdown=True):
-            dirs[:] = [d for d in dirs if d[0] != '.'] # ignore dot directories
-            if prefix_regex:
-                if not prefix_regex.search(root): continue
+            else:
+                module_regex = re.compile(ur'^(?:test\S+|\S+test)\.py$', re.I)
+                package_regex = re.compile(ur'^(?:test\S+|\S+test)$', re.I)
 
-            for f in files:
-                if module_regex.search(f) or (f.startswith("__init__") and package_regex.search(os.path.basename(root))):
-                    filepath = os.path.join(root, f)
-                    found = True
-                    echo.debug('Module path: {}', filepath)
-                    yield filepath
+            prefix_regex = ''
+            if module_prefix:
+                #prefix_regex = re.compile(module_prefix.replace('.', '[\\/]'), re.I)
+                prefix_regex = re.compile(module_prefix, re.I)
+
+            for root, dirs, files in os.walk(basedir, topdown=True):
+                dirs[:] = [d for d in dirs if d[0] != '.'] # ignore dot directories
+                if prefix_regex:
+                    if not prefix_regex.search(root): continue
+
+                for f in files:
+                    if module_regex.search(f) or (f.startswith("__init__") and package_regex.search(os.path.basename(root))):
+                        filepath = os.path.join(root, f)
+                        echo.debug('Module path: {}', filepath)
+                        yield filepath
 
 
     def module_path(self, filepath):
@@ -467,7 +490,7 @@ class TestRunner(unittest.TextTestRunner):
         stream = environ.stderr_stream
         super(TestRunner, self).__init__(
             stream=stream,
-            failfast=not environ.args.no_failfast,
+            failfast=not environ.no_failfast,
             *args,
             **kwargs
         )
@@ -490,13 +513,16 @@ class TestRunner(unittest.TextTestRunner):
         return result
 
 
-def run_test(name, basedir, environ, **kwargs):
+def run_test(name, basedir, environ=None, **kwargs):
     '''
     run the test found with find_test() with unittest
 
     **kwargs -- dict -- all other args to pass to unittest
     '''
     ret_code = 0
+
+    if not environ:
+        environ = TestEnviron()
 
     tl = TestLoader(basedir, environ)
     tr = TestRunner(environ)
