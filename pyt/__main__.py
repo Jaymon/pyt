@@ -4,7 +4,7 @@ import sys
 import argparse
 import os
 
-from pyt import tester, echo, __version__
+from pyt import tester, __version__
 
 
 def console():
@@ -33,7 +33,6 @@ def console():
         args.no_failfast = True
         args.debug = True
 
-    echo.DEBUG = args.debug
 
     test_args.insert(0, sys.argv[0])
     ret_code = 0

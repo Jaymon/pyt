@@ -44,8 +44,8 @@ class Client(object):
                 char = process.stdout.read(1)
                 if char == '' and process.poll() is not None:
                     break
-                sys.stdout.write(char)
-                sys.stdout.flush()
+                #sys.stdout.write(char)
+                #sys.stdout.flush()
                 r += char
 
             if process.returncode != expected_ret_code:
@@ -286,7 +286,6 @@ class RunTestTest(TestCase):
 
         r = s.run('pmod --debug')
 
-
     def test_debug(self):
         m = TestModule(
             "from unittest import TestCase",
@@ -301,7 +300,11 @@ class RunTestTest(TestCase):
         s = Client(m.cwd)
 
         r = s.run('debug_test --no-buffer --debug')
-        pout.v(r)
+        r2 = s.run('debug_test --debug')
+        r3 = s.run('debug_test')
+        self.assertNotEqual(r, r2)
+        self.assertNotEqual(r, r3)
+        self.assertNotEqual(r2, r3)
 
     def test_parse_error2(self):
         m = TestModule(

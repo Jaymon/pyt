@@ -25,14 +25,17 @@ class TestEnviron(object):
         self.buffer = False
         self.no_buffer = False
         self.no_failfast = False
+        self.debug = False
         self.args = args
         if args:
+            self.debug = args.debug
             self.no_failfast = args.no_failfast
             self.no_buffer = args.no_buffer
             self.buffer = args.buffer
 
         self.init_buf()
         self.counter = Counter()
+        echo.configure(self)
 
     def init_buf(self):
         if self.buffer or not self.no_buffer:
