@@ -42,6 +42,6 @@ setup(
         'console_scripts': ['{}2 = {}.__main__:console'.format(name, name)]
     },
     scripts=[
-        '{}/bin/{}'.format(name),
+        '{}/bin/{}'.format(name, name),
     ],
 )
