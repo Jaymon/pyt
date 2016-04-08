@@ -797,3 +797,22 @@ class TestResultTest(TestCase):
             m.cwd
         )
 
+
+import threading
+class ThreadingTest(TestCase):
+
+    def test_threading_import(self):
+        """Turns out there is a race condition when importing common.models.chat,
+        this test is the minimum viable fail case so Jay can track it down"""
+        saved_chat = sys.modules.pop("common.models.chat", None)
+
+        def target():
+            import testdata
+
+        #t1 = TestThread(target=target)
+        t1 = threading.Thread(target=target)
+        t1.start()
+        t1.join()
+
+
+

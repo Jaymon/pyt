@@ -21,6 +21,9 @@ class TestEnviron(object):
     stdout_buffer = StringIO()
     stderr_buffer = StringIO()
 
+    _instance = None
+    """singleton"""
+
     def __init__(self, args=None):
         self.buffer = False
         self.no_buffer = False
@@ -36,6 +39,12 @@ class TestEnviron(object):
         self.init_buf()
         self.counter = Counter()
         echo.configure(self)
+
+    @classmethod
+    def get_instance(cls, args=None):
+        if args or not cls._instance:
+            cls._instance = cls(args)
+        return cls._instance
 
     def init_buf(self):
         if self.buffer or not self.no_buffer:
@@ -488,12 +497,12 @@ class TestRunner(unittest.TextTestRunner):
     """
     resultclass = TestResult
 
-    def __init__(self, environ, *args, **kwargs):
-        self.environ = environ
-        stream = environ.stderr_stream
+    def __init__(self, *args, **kwargs):
+        self.environ = TestEnviron.get_instance()
+        stream = self.environ.stderr_stream
         super(TestRunner, self).__init__(
             stream=stream,
-            failfast=not environ.no_failfast,
+            failfast=not self.environ.no_failfast,
             *args,
             **kwargs
         )
@@ -516,7 +525,7 @@ class TestRunner(unittest.TextTestRunner):
         return result
 
 
-def run_test(name, basedir, environ=None, **kwargs):
+def run_test(name, basedir, **kwargs):
     '''
     run the test found with find_test() with unittest
 
@@ -524,19 +533,16 @@ def run_test(name, basedir, environ=None, **kwargs):
     '''
     ret_code = 0
 
-    if not environ:
-        environ = TestEnviron()
-
+    environ = TestEnviron.get_instance()
     tl = TestLoader(basedir, environ)
-    tr = TestRunner(environ)
 
     kwargs.setdefault('argv', ['run_test'])
     kwargs['argv'].append(name)
 
     kwargs.setdefault('exit', False)
     kwargs.setdefault('testLoader', tl)
-    #kwargs.setdefault('testRunner', TestRunner)
-    kwargs.setdefault('testRunner', tr)
+    kwargs.setdefault('testRunner', TestRunner)
+    #kwargs.setdefault('testRunner', tr)
 
     # https://docs.python.org/2/library/unittest.html#unittest.main
     try:

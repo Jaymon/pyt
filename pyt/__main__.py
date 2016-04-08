@@ -37,7 +37,8 @@ def console():
     test_args.insert(0, sys.argv[0])
     ret_code = 0
 
-    environ = tester.TestEnviron(args)
+    # create the singleton
+    environ = tester.TestEnviron.get_instance(args)
 
     if not args.names:
         if args.run_all:
@@ -49,7 +50,6 @@ def console():
                 name,
                 args.basedir,
                 argv=test_args,
-                environ=environ
             )
 
     else:
