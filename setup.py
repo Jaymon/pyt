@@ -39,6 +39,9 @@ setup(
     ],
     #test_suite = "test_pout",
     entry_points = {
-        'console_scripts': ['{} = {}.__main__:console'.format(name, name)]
-    }
+        'console_scripts': ['{}2 = {}.__main__:console'.format(name, name)]
+    },
+    scripts=[
+        '{}/bin/{}'.format(name),
+    ],
 )
