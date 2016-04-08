@@ -3,7 +3,7 @@
 import os
 
 from pyt import __version__
-from pyt.__main__ import console
+from pyt.console import console
 
 
 sys.exit(console())
