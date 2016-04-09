@@ -1,7 +1,4 @@
 #!/usr/bin/env python
-# I shamefully ripped most of this off from fbconsole
-# http://docs.python.org/distutils/setupscript.html
-# http://docs.python.org/2/distutils/examples.html
 from setuptools import setup, find_packages
 import re
 import os
@@ -33,7 +30,4 @@ setup(
     entry_points = {
         'console_scripts': ['{} = {}.__main__:console'.format(name, name)]
     },
-#     scripts=[
-#         '{}/bin/{}'.format(name, name),
-#     ],
 )
