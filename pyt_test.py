@@ -234,7 +234,7 @@ class RunTestTest(TestCase):
         })
 
         s = Client(basedir)
-        r = s.run("bar che")
+        r = s.run("bar che --debug")
         self.assertTrue("bar_test" in r)
         self.assertTrue("che_test" in r)
         self.assertTrue("Ran 2 tests" in r)
@@ -264,20 +264,6 @@ class RunTestTest(TestCase):
 
         r = s.run("pmod.Bar")
         self.assertTrue("in bar test" in r)
-
-    def test_buffer_init(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class BarTest(TestCase):",
-            "    def test_bar(self):",
-            "        print 'in bar test'",
-            "",
-        )
-
-        s = Client(m.cwd)
-        r = s.run("--buffer")
-        pout.v(r)
 
     def test_filepath(self):
         m = testdata.create_module("bar.foo_test", [
@@ -387,7 +373,7 @@ class RunTestTest(TestCase):
 
         s = Client(m.cwd)
 
-        r = s.run('foo_test.BARTest.test_che')
+        r = s.run('foo_test.BARTest.test_che --debug')
         self.assertTrue('foo_test.BARTest.test_che' in r)
 
     def test_error_print_on_failure(self):

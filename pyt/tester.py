@@ -54,11 +54,6 @@ class TestEnviron(object):
         if sys.stderr is not self.stderr_stream:
             sys.stderr = self.stderr_stream
 
-    def unbuffer_if_one_test(self):
-        if self.counter["methods"] == 1 and len(self.counter) == 1:
-            if not self.buffer:
-                self.unbuffer()
-
     def update_env_for_test(self, test_count):
         # not sure how much I love messing with the environment right here, but this
         # does propagate down to the test cases
@@ -402,7 +397,7 @@ class TestLoader(unittest.TestLoader):
                 for c, mn in tc.method_names():
                     #echo.debug('adding test method to suite: {}', mn)
                     #echo.out('Found method test: {}.{}.{}', c.__module__, c.__name__, mn)
-                    echo.out('Found method test: {}.{}', strclass(c), mn)
+                    echo.debug('Found method test: {}.{}', strclass(c), mn)
                     found = True
                     ts.addTest(c(mn))
                     self.environ.counter["methods"] += 1
@@ -411,7 +406,7 @@ class TestLoader(unittest.TestLoader):
                 for c in tc.classes():
                     #echo.debug('adding testcase to suite: {}', c.__name__)
                     #echo.out('Found class test: {}.{}', c.__module__, c.__name__)
-                    echo.out('Found class test: {}', strclass(c))
+                    echo.debug('Found class test: {}', strclass(c))
                     found = True
                     ts.addTest(self.loadTestsFromTestCase(c))
                     self.environ.counter["classes"] += 1
@@ -419,7 +414,7 @@ class TestLoader(unittest.TestLoader):
             else:
                 for m in tc.modules():
                     #echo.debug('adding module to suite: {}', m.__name__)
-                    echo.out('Found module test: {}', m.__name__)
+                    echo.debug('Found module test: {}', m.__name__)
                     found = True
                     ts.addTest(self.loadTestsFromModule(m))
                     self.environ.counter["modules"] += 1
@@ -431,7 +426,6 @@ class TestLoader(unittest.TestLoader):
             ti.raise_any_error()
 
         echo.debug("Found {} total tests".format(ts.countTestCases()))
-        self.environ.unbuffer_if_one_test()
         return ts
 
     def loadTestsFromNames(self, names, *args, **kwargs):
