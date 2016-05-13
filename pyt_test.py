@@ -201,6 +201,23 @@ class TestInfoTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_all(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BarTest(TestCase):",
+            "    def test_bar(self):",
+            "        print 'in bar test'",
+            "",
+        )
+
+        s = Client(m.cwd)
+        r = s.run("--all") # should buffer
+        r2 = s.run("") # should print "in bar test"
+        r3 = s.run("--buffer") # should be just like --all
+        self.assertNotEqual(r, r2)
+        self.assertEqual(r, r3)
+
     def test_multiple(self):
         basedir = testdata.create_modules({
             "multiple_test": "",
@@ -233,7 +250,7 @@ class RunTestTest(TestCase):
         )
 
         s = Client(m.cwd)
-        r = s.run("pmod")
+        r = s.run("pmod --buffer")
         self.assertFalse("in bar test" in r)
 
         r = s.run("pmod.Bar.bar")
@@ -242,11 +259,25 @@ class RunTestTest(TestCase):
         r = s.run("pmod.Bar.bar --buffer")
         self.assertFalse("in bar test" in r)
 
-        r = s.run("pmod.Bar")
+        r = s.run("pmod.Bar --buffer")
         self.assertFalse("in bar test" in r)
 
-        r = s.run("pmod.Bar --no-buffer")
+        r = s.run("pmod.Bar")
         self.assertTrue("in bar test" in r)
+
+    def test_buffer_init(self):
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class BarTest(TestCase):",
+            "    def test_bar(self):",
+            "        print 'in bar test'",
+            "",
+        )
+
+        s = Client(m.cwd)
+        r = s.run("--buffer")
+        pout.v(r)
 
     def test_filepath(self):
         m = testdata.create_module("bar.foo_test", [
@@ -275,7 +306,7 @@ class RunTestTest(TestCase):
         ])
 
         s = Client(m.basedir)
-        r = s.run("foo_test --no-buffer")
+        r = s.run("foo_test")
         self.assertTrue("in foo test" in r)
 
     def test_environ(self):
@@ -300,10 +331,10 @@ class RunTestTest(TestCase):
         s = Client(m.cwd)
 
         with self.assertRaises(RuntimeError):
-            r = s.run('Bar --debug --no-buffer')
+            r = s.run('Bar --debug')
 
         with self.assertRaises(RuntimeError):
-            r = s.run('Foo --debug --no-buffer')
+            r = s.run('Foo --debug')
 
         r = s.run('pmod --debug')
 
@@ -320,9 +351,9 @@ class RunTestTest(TestCase):
 
         s = Client(m.cwd)
 
-        r = s.run('debug_test --no-buffer --debug')
+        r = s.run('debug_test --buffer --debug')
         r2 = s.run('debug_test --debug')
-        r3 = s.run('debug_test')
+        r3 = s.run('debug_test --buffer')
         self.assertNotEqual(r, r2)
         self.assertNotEqual(r, r3)
         self.assertNotEqual(r2, r3)
@@ -356,7 +387,7 @@ class RunTestTest(TestCase):
 
         s = Client(m.cwd)
 
-        r = s.run('foo_test.BARTest.test_che --no-buffer')
+        r = s.run('foo_test.BARTest.test_che')
         self.assertTrue('foo_test.BARTest.test_che' in r)
 
     def test_error_print_on_failure(self):
@@ -390,10 +421,10 @@ class RunTestTest(TestCase):
 
         s = Client(m.cwd)
 
-        r = s.run('--all', code=1)
+        r = s.run('--all --failfast', code=1)
         self.assertTrue('.F.' not in r)
 
-        r = s.run('--all --no-failfast', code=1)
+        r = s.run('--all', code=1)
         self.assertTrue('.F.' in r)
 
     def test_parse_error(self):
@@ -542,7 +573,7 @@ class RunTestTest(TestCase):
 
         s = Client(m.cwd)
 
-        r = s.run('foo --debug --no-buffer')
+        r = s.run('foo --debug')
         self.assertTrue('Found module test: prefix_search.foo_test' in r)
 
     def test_ignore_non_test_modules(self):
@@ -564,7 +595,7 @@ class RunTestTest(TestCase):
         )
 
         s = Client(cwd)
-        r = s.run('tint --debug --no-buffer')
+        r = s.run('tint --debug')
         self.assertEqual(1, r.count('Found module test'))
 
     def test_prefix_search(self):
@@ -585,13 +616,13 @@ class RunTestTest(TestCase):
 
         s = Client(m.cwd)
 
-        r = s.run('test_handshake --debug --no-buffer')
+        r = s.run('test_handshake --debug')
         self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
 
-        r = s.run('Bar.test_handshake --debug --no-buffer')
+        r = s.run('Bar.test_handshake --debug')
         self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
 
-        r = s.run('che --debug --no-buffer')
+        r = s.run('che --debug')
         self.assertTrue('Found module test: prefix_search.chebaz_test' in r)
 
         with self.assertRaises(RuntimeError):

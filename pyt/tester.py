@@ -26,14 +26,10 @@ class TestEnviron(object):
 
     def __init__(self, args=None):
         self.buffer = False
-        self.no_buffer = False
-        self.no_failfast = False
         self.debug = False
         self.args = args
         if args:
             self.debug = args.debug
-            self.no_failfast = args.no_failfast
-            self.no_buffer = args.no_buffer
             self.buffer = args.buffer
 
         self.init_buf()
@@ -47,7 +43,7 @@ class TestEnviron(object):
         return cls._instance
 
     def init_buf(self):
-        if self.buffer or not self.no_buffer:
+        if self.buffer:
             sys.stdout = self.stdout_buffer
             sys.stderr = self.stderr_buffer
 
@@ -508,7 +504,6 @@ class TestRunner(unittest.TextTestRunner):
         stream = self.environ.stderr_stream
         super(TestRunner, self).__init__(
             stream=stream,
-            failfast=not self.environ.no_failfast,
             *args,
             **kwargs
         )

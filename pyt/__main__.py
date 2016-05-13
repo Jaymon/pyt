@@ -19,29 +19,27 @@ def console():
     parser.add_argument('--debug', dest='debug', action='store_true', help='print debugging info')
     parser.add_argument("--version", "-V", action='version', version="%(prog)s {}".format(__version__))
     parser.add_argument('--all', dest='run_all', action='store_true', help='run all tests if no NAME specified')
-    parser.add_argument('--fad', dest='daf', action='store_true', help='run with --all --no-faifast --debug')
+    #parser.add_argument('--fad', dest='daf', action='store_true', help='run with --all --no-faifast --debug')
 
     # https://docs.python.org/2/library/unittest.html#command-line-options
-    parser.add_argument('--no-failfast', dest='no_failfast', action='store_true', help='turns off fail fast')
-    parser.add_argument('--no-buffer', dest='no_buffer', action='store_true', help='turns off buffer when more than one test is ran')
-    parser.add_argument('--buffer', dest='buffer', action='store_true', help='turns on buffer when one test is ran')
+    #parser.add_argument('--no-failfast', dest='no_failfast', action='store_true', help='turns off fail fast')
+    #parser.add_argument('--no-buffer', dest='no_buffer', action='store_true', help='turns off buffer when more than one test is ran')
+    parser.add_argument('--buffer', dest='buffer', action='store_true', help='Buffer stdout and stderr during test runs')
 
     args, test_args = parser.parse_known_args()
 
-    if args.daf:
-        args.run_all = True
-        args.no_failfast = True
-        args.debug = True
-
     test_args.insert(0, sys.argv[0])
     ret_code = 0
+
+    if args.run_all:
+        args.names = ['']
+        args.buffer = True
 
     # create the singleton
     environ = tester.TestEnviron.get_instance(args)
 
     if not args.names:
-        if args.run_all:
-            args.names.append('')
+        args.names.append('')
 
     if args.names:
         for name in args.names:
