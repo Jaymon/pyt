@@ -398,8 +398,8 @@ class RunTestTest(TestCase):
         cwd = testdata.create_dir()
         testdata.create_modules(
             {
-                'tests': 'from unittest import TestCase',
-                'tests.foo_test': "\n".join([
+                'ritests': 'from unittest import TestCase',
+                'ritests.foo_test': "\n".join([
                     'from . import TestCase',
                     '',
                     'class FooTest(TestCase):',
@@ -642,6 +642,66 @@ class RunTestTest(TestCase):
 
 
 class TestLoaderTest(TestCase):
+    def test_package(self):
+
+        basedir = testdata.create_modules({
+            "packagefoo2_test": "",
+            "packagefoo2_test.bar_test": [
+                "from unittest import TestCase",
+                "class BarTest(TestCase):",
+                "   def test_baz(self): pass",
+            ],
+            "packagefoo2_test.che_test": [
+                "from unittest import TestCase",
+                "class CheTest(TestCase):",
+                "   def test_baz(self): pass",
+            ]
+        })
+
+        tl = tester.TestLoader(basedir, tester.TestEnviron())
+        s = tl.loadTestsFromName("packagefoo")
+        self.assertTrue('BarTest' in str(s))
+        self.assertTrue('CheTest' in str(s))
+
+        basedir = testdata.create_modules({
+            "packagefoo_test": "",
+            "packagefoo_test.bar": "",
+            "packagefoo_test.bar.zoom_test": [
+                "from unittest import TestCase",
+                "class BarTest(TestCase):",
+                "   def test_baz(self): pass",
+            ],
+            "packagefoo_test.che_test": [
+                "from unittest import TestCase",
+                "class CheTest(TestCase):",
+                "   def test_baz(self): pass",
+            ]
+        })
+
+        tl = tester.TestLoader(basedir, tester.TestEnviron())
+        s = tl.loadTestsFromName("packagefoo")
+        self.assertTrue('BarTest' in str(s))
+        self.assertTrue('CheTest' in str(s))
+
+        basedir = testdata.create_modules({
+            "tests": "",
+            "tests.bar_test": [
+                "from unittest import TestCase",
+                "class BarTest(TestCase):",
+                "   def test_baz(self): pass",
+            ],
+            "tests.che_test": [
+                "from unittest import TestCase",
+                "class CheTest(TestCase):",
+                "   def test_baz(self): pass",
+            ]
+        })
+
+        tl = tester.TestLoader(basedir, tester.TestEnviron())
+        s = tl.loadTestsFromName("tests")
+        self.assertTrue('BarTest' in str(s))
+        self.assertTrue('CheTest' in str(s))
+
     def test_suite(self):
         m = TestModule(
             "from unittest import TestCase",

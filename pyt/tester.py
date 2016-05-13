@@ -279,7 +279,7 @@ class TestCaseInfo(object):
                         re.I
                     )
                     package_regex = re.compile(
-                        ur'^{}$'.format(module_name),
+                        ur'^{}|{}$'.format(module_name, module_name),
                         re.I
                     )
 
@@ -308,10 +308,25 @@ class TestCaseInfo(object):
                     if not prefix_regex.search(root): continue
 
                 for f in files:
-                    if module_regex.search(f) or (f.startswith("__init__") and package_regex.search(os.path.basename(root))):
+                    if module_regex.search(f):
                         filepath = os.path.join(root, f)
                         echo.debug('Module path: {}', filepath)
                         yield filepath
+
+                    elif f.startswith("__init__") and package_regex.search(os.path.basename(root)):
+                        pmodule_regex = re.compile(ur'.py$', re.I)
+                        for proot, pdirs, pfiles in os.walk(root, topdown=True):
+                            pdirs[:] = [d for d in dirs if d[0] != '.']
+                            for pf in pfiles:
+                                if pmodule_regex.search(f):
+                                    filepath = os.path.join(proot, pf)
+                                    echo.debug('Submodule path: {}', filepath)
+                                    yield filepath
+
+#                     if module_regex.search(f) or (f.startswith("__init__") and package_regex.search(os.path.basename(root))):
+#                         filepath = os.path.join(root, f)
+#                         echo.debug('Module path: {}', filepath)
+#                         yield filepath
 
 
     def module_path(self, filepath):
@@ -347,15 +362,6 @@ class TestCaseInfo(object):
 
 # https://hg.python.org/cpython/file/tip/Lib/unittest/suite.py
 class TestSuite(unittest.TestSuite):
-#     def __len__(self):
-#         count = 0
-#         for test in self._tests:
-#             if isinstance(test, type(self)):
-#                 count += len(test)
-#             else:
-#                 count += 1
-#         return count
-
     def __str__(self):
         lines = []
         for test in self._tests:

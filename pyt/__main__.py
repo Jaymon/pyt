@@ -33,7 +33,6 @@ def console():
         args.no_failfast = True
         args.debug = True
 
-
     test_args.insert(0, sys.argv[0])
     ret_code = 0
 
