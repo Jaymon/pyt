@@ -201,6 +201,27 @@ class TestInfoTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_multiple(self):
+        basedir = testdata.create_modules({
+            "multiple_test": "",
+            "multiple_test.bar_test": [
+                "from unittest import TestCase",
+                "class BarTest(TestCase):",
+                "   def test_baz(self): pass",
+            ],
+            "multiple_test.che_test": [
+                "from unittest import TestCase",
+                "class CheTest(TestCase):",
+                "   def test_baz(self): pass",
+            ]
+        })
+
+        s = Client(basedir)
+        r = s.run("bar che")
+        self.assertTrue("bar_test" in r)
+        self.assertTrue("che_test" in r)
+        self.assertTrue("Ran 2 tests" in r)
+
     def test_buffer(self):
         m = TestModule(
             "from unittest import TestCase",
