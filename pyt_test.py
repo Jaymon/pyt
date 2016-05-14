@@ -51,7 +51,7 @@ class Client(object):
             if process.returncode != expected_ret_code:
                 raise RuntimeError("cmd returned {} with output: {}".format(process.returncode, r))
 
-        except subprocess.CalledProcessError, e:
+        except subprocess.CalledProcessError as e:
             raise RuntimeError("cmd returned {} with output: {}".format(e.returncode, e.output))
 
         return r
