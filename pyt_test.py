@@ -201,6 +201,38 @@ class TestInfoTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_double_counting_and_pyc(self):
+        """Make sure packages don't get double counted"""
+        # https://github.com/Jaymon/pyt/issues/18
+        # https://github.com/Jaymon/pyt/issues/19
+        basedir = testdata.create_modules({
+            "dc_test": "",
+            "dc_test.bar_test": [
+                "from unittest import TestCase",
+                "class BarTest(TestCase):",
+                "   def test_baz(self): pass",
+            ],
+            "dc_test.che_test": [
+                "from unittest import TestCase",
+                "class CheTest(TestCase):",
+                "   def test_baz(self): pass",
+            ]
+        })
+
+        s = Client(basedir)
+        r = s.run("dc_test --debug")
+        self.assertTrue("Found 2 total tests" in r)
+
+        # running it again will test for the pyc problem
+        r = s.run("dc_test --debug")
+        self.assertFalse("No module named pyc" in r)
+
+        r = s.run("--all --debug")
+        self.assertTrue("Found 2 total tests" in r)
+
+        r = s.run("--all --debug")
+        self.assertFalse("No module named pyc" in r)
+
     def test_all(self):
         m = TestModule(
             "from unittest import TestCase",
@@ -680,8 +712,32 @@ class RunTestTest(TestCase):
 
 
 class TestLoaderTest(TestCase):
-    def test_package(self):
+    def test_private_testcase(self):
+        # https://github.com/Jaymon/pyt/issues/17
+        m = TestModule(
+            "from unittest import TestCase as BaseTC",
+            "",
+            "class _TestCase(BaseTC):",
+            "   def test_common(self): pass",
+            "",
+            "class CheTest(_TestCase):",
+            "   def test_foo(self): pass"
+        )
 
+        tl = m.tl
+        s = tl.loadTestsFromName(m.name)
+        r = str(s)
+        self.assertFalse("_TestCase.test_common" in r)
+
+        s = tl.loadTestsFromName("{}.Che".format(m.name))
+        r = str(s)
+        self.assertFalse("_TestCase.test_common" in r)
+
+        s = tl.loadTestsFromName("{}.Che.foo".format(m.name))
+        r = str(s)
+        self.assertFalse("_TestCase.test_common" in r)
+
+    def test_package(self):
         basedir = testdata.create_modules({
             "packagefoo2_test": "",
             "packagefoo2_test.bar_test": [

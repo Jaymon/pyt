@@ -293,6 +293,7 @@ class TestCaseInfo(object):
                 #prefix_regex = re.compile(module_prefix.replace('.', '[\\/]'), re.I)
                 prefix_regex = re.compile(module_prefix, re.I)
 
+            seen_paths = set()
             for root, dirs, files in os.walk(basedir, topdown=True):
                 dirs[:] = [d for d in dirs if d[0] != '.'] # ignore dot directories
                 if prefix_regex:
@@ -301,24 +302,22 @@ class TestCaseInfo(object):
                 for f in files:
                     if module_regex.search(f):
                         filepath = os.path.join(root, f)
-                        echo.debug('Module path: {}', filepath)
-                        yield filepath
+                        if filepath not in seen_paths:
+                            echo.debug('Module path: {}', filepath)
+                            seen_paths.add(filepath)
+                            yield filepath
 
                     elif f.startswith("__init__") and package_regex.search(os.path.basename(root)):
                         pmodule_regex = re.compile(ur'.py$', re.I)
                         for proot, pdirs, pfiles in os.walk(root, topdown=True):
                             pdirs[:] = [d for d in dirs if d[0] != '.']
                             for pf in pfiles:
-                                if pmodule_regex.search(f):
+                                if pmodule_regex.search(pf):
                                     filepath = os.path.join(proot, pf)
-                                    echo.debug('Submodule path: {}', filepath)
-                                    yield filepath
-
-#                     if module_regex.search(f) or (f.startswith("__init__") and package_regex.search(os.path.basename(root))):
-#                         filepath = os.path.join(root, f)
-#                         echo.debug('Module path: {}', filepath)
-#                         yield filepath
-
+                                    if filepath not in seen_paths:
+                                        echo.debug('Submodule path: {}', filepath)
+                                        seen_paths.add(filepath)
+                                        yield filepath
 
     def module_path(self, filepath):
         """given a filepath like /base/path/to/module.py this will convert it to
@@ -353,6 +352,15 @@ class TestCaseInfo(object):
 
 # https://hg.python.org/cpython/file/tip/Lib/unittest/suite.py
 class TestSuite(unittest.TestSuite):
+    def addTest(self, test):
+        """This will filter out "private" classes that begin with an underscore"""
+        add_it = True
+        if isinstance(test, unittest.TestCase):
+            add_it = not test.__class__.__name__.startswith("_")
+
+        if add_it:
+            super(TestSuite, self).addTest(test)
+
     def __str__(self):
         lines = []
         for test in self._tests:
@@ -385,6 +393,11 @@ class TestLoader(unittest.TestLoader):
         d = os.path.expanduser(d)
         d = os.path.abspath(d)
         return d
+
+#     def loadTestsFromModule(self, *args, **kwargs):
+#         tests = super(TestLoader, self).loadTestsFromModule(*args, **kwargs)
+#         pout.v(tests)
+#         return tests
 
     def loadTestsFromName(self, name, *args, **kwargs):
         ts = self.suiteClass()
