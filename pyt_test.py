@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 import unittest
 from unittest import TestCase
 import os
@@ -16,6 +18,7 @@ if 'pyt' in sys.modules:
 import pyt
 from pyt import tester
 from pyt import echo
+from pyt.compat import *
 
 
 echo.DEBUG = True
@@ -27,10 +30,17 @@ class Client(object):
         self.cwd = cwd
 
     def run(self, arg_str='', **options):
-        cmd = "python -m pyt --basedir={} {}".format(self.cwd, arg_str)
+        #cmd = "python -m pyt --basedir={} {}".format(self.cwd, arg_str)
+        cmd = "{} -m pyt --basedir={} {}".format(os.environ["_"], self.cwd, arg_str)
         expected_ret_code = options.get('code', 0)
 
-        r = ''
+        def get_output_str(output):
+            if is_py2:
+                return "\n".join(output)
+            elif is_py3:
+                return "\n".join((o.decode("utf-8") for o in output))
+
+        output = []
         try:
             process = subprocess.Popen(
                 cmd,
@@ -40,21 +50,28 @@ class Client(object):
                 cwd=os.curdir
             )
 
-            while True:
-                char = process.stdout.read(1)
-                if char == '' and process.poll() is not None:
-                    break
-                #sys.stdout.write(char)
-                #sys.stdout.flush()
-                r += char
+            for line in iter(process.stdout.readline, b""):
+                output.append(line.rstrip())
 
+#             while True:
+#                 char = process.stdout.read(1)
+#                 if char == '' and process.poll() is not None:
+#                     break
+#                 #sys.stdout.write(char)
+#                 #sys.stdout.flush()
+#                 r += char.decode("utf-8")
+
+            process.wait()
             if process.returncode != expected_ret_code:
-                raise RuntimeError("cmd returned {} with output: {}".format(process.returncode, r))
+                raise RuntimeError("cmd returned {} with output: {}".format(
+                    process.returncode,
+                    get_output_str(output)
+                ))
 
         except subprocess.CalledProcessError as e:
             raise RuntimeError("cmd returned {} with output: {}".format(e.returncode, e.output))
 
-        return r
+        return get_output_str(output)
 
 
 class TestModule(object):
@@ -235,11 +252,12 @@ class RunTestTest(TestCase):
 
     def test_all(self):
         m = TestModule(
+            "from __future__ import print_function",
             "from unittest import TestCase",
             "",
             "class BarTest(TestCase):",
             "    def test_bar(self):",
-            "        print 'in bar test'",
+            "        print('in bar test')",
             "",
         )
 
@@ -273,11 +291,12 @@ class RunTestTest(TestCase):
 
     def test_buffer(self):
         m = TestModule(
+            "from __future__ import print_function",
             "from unittest import TestCase",
             "",
             "class BarTest(TestCase):",
             "    def test_bar(self):",
-            "        print 'in bar test'",
+            "        print('in bar test')",
             "",
         )
 
@@ -303,7 +322,6 @@ class RunTestTest(TestCase):
             "class FooTest(TestCase):",
             "    def test_foo(self):",
             "        pass",
-            #"        print 'in foo test'",
             "",
         ])
 
@@ -316,10 +334,11 @@ class RunTestTest(TestCase):
 
     def test_package(self):
         m = testdata.create_package("foo_test", [
+            "from __future__ import print_function",
             "from unittest import TestCase",
             "class FooTest(TestCase):",
             "    def test_foo(self):",
-            "        print 'in foo test'",
+            "        print('in foo test')",
             "",
         ])
 
@@ -358,11 +377,12 @@ class RunTestTest(TestCase):
 
     def test_debug(self):
         m = TestModule(
+            "from __future__ import print_function",
             "from unittest import TestCase",
             "",
             "class DebugTest(TestCase):",
             "  def test_debug(self):",
-            "    print 'hi'",
+            "    print('hi')",
             "",
             name="debug_test"
         )
@@ -676,10 +696,11 @@ class RunTestTest(TestCase):
 
     def test_setup(self):
         m = TestModule(
+            "from __future__ import print_function",
             "from unittest import TestCase",
             "",
             "def setUpModule():",
-            "    print 'here'",
+            "    print('here')",
             "",
             "class BaseTCase(TestCase):",
             "    def test_foo(self):",
@@ -910,6 +931,7 @@ class TestLoaderTest(TestCase):
 class TestResultTest(TestCase):
     def test_buffering(self):
         m = TestModule(
+            "from __future__ import print_function",
             "from unittest import TestCase",
             "import logging",
             "import sys",
@@ -926,7 +948,7 @@ class TestResultTest(TestCase):
             "",
             "   def test_failure(self):",
             "       logger.info('foo')",
-            "       print 'bar'",
+            "       print('bar')",
             "       self.assertTrue(False)",
             "",
         )

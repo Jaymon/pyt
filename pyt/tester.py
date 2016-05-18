@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # https://docs.python.org/2/library/unittest.html
+from __future__ import unicode_literals
 import re
 import os
 import unittest
@@ -7,11 +8,12 @@ from unittest.util import strclass
 import sys
 import inspect
 import importlib
-from StringIO import StringIO
+#from StringIO import StringIO
 import time
 from collections import Counter
 
 from . import echo
+from .compat import *
 
 
 class TestEnviron(object):
@@ -95,25 +97,25 @@ class TestInfo(object):
             name = bits[1] if len(bits) > 1 else ""
             echo.debug('Found filepath: {}', filepath)
 
-        bits = name.split(u'.')
+        bits = name.split('.')
         basedir = self.basedir
         method_prefix = self.method_prefix
 
         # check if the last bit is a Class
-        if re.search(ur'^[A-Z]', bits[-1]):
+        if re.search(r'^[A-Z]', bits[-1]):
             echo.debug('Found class in name: {}', bits[-1])
             possible.append(TestCaseInfo(basedir, method_prefix, **{
                 'class_name': bits[-1],
-                'module_name': bits[-2] if len(bits) > 1 else u'',
+                'module_name': bits[-2] if len(bits) > 1 else '',
                 'prefix': os.sep.join(bits[0:-2]),
                 'filepath': filepath,
             }))
-        elif len(bits) > 1 and re.search(ur'^[A-Z]', bits[-2]):
+        elif len(bits) > 1 and re.search(r'^[A-Z]', bits[-2]):
             echo.debug('Found class in name: {}', bits[-2])
             possible.append(TestCaseInfo(basedir, method_prefix, **{
                 'class_name': bits[-2],
                 'method_name': bits[-1],
-                'module_name': bits[-3] if len(bits) > 2 else u'',
+                'module_name': bits[-3] if len(bits) > 2 else '',
                 'prefix': os.sep.join(bits[0:-3]),
                 'filepath': filepath,
             }))
@@ -127,7 +129,7 @@ class TestInfo(object):
                 }))
                 possible.append(TestCaseInfo(basedir, method_prefix, **{
                     'method_name': bits[-1],
-                    'module_name': bits[-2] if len(bits) > 1 else u'',
+                    'module_name': bits[-2] if len(bits) > 1 else '',
                     'prefix': os.sep.join(bits[0:-2]),
                     'filepath': filepath,
                 }))
@@ -142,7 +144,7 @@ class TestCaseInfo(object):
     def __init__(self, basedir, method_prefix='test', **kwargs):
         self.basedir = basedir
         self.method_prefix = method_prefix
-        for k, v in kwargs.iteritems():
+        for k, v in kwargs.items():
             setattr(self, k, v)
 
     def has_module(self):
@@ -158,11 +160,11 @@ class TestCaseInfo(object):
         return bool(v)
 
     def __str__(self):
-        ret = u''
+        ret = ''
         for k in ['prefix', 'module_name', 'class_name', 'method_name']:
             v = getattr(self, k, None)
             if v:
-                ret += u"{}: {}, ".format(k, v)
+                ret += "{}: {}, ".format(k, v)
 
         return ret.rstrip(', ')
 
@@ -170,7 +172,21 @@ class TestCaseInfo(object):
         """raise an error if one was found, otherwise do nothing"""
         error_info = getattr(self, 'error_info', None)
         if error_info:
-            raise error_info[0].__class__, error_info[0], error_info[1][2]
+
+            reraise(*error_info)
+
+#             if py_2:
+#                 #raise error_info[0].__class__, error_info[0], error_info[1][2]
+#                 reraise(*error_info)
+#                 #raise error_info[0].__class__, error_info[1], error_info[2]
+# 
+#             elif py_3:
+#                 #e, exc_info = error_info
+#                 #et, ei, tb = exc_info
+# 
+#                 reraise(*error_info)
+#                 #et, ei, tb = error_info
+#                 #raise ei.with_traceback(tb)
 
     def modules(self):
         """return modules that match module_name"""
@@ -183,13 +199,14 @@ class TestCaseInfo(object):
                 m = importlib.import_module(module_name)
                 yield m
 
-            except Exception, e:
+            except Exception as e:
                 echo.debug('Caught exception while importing {}: {}', p, e)
                 error_info = getattr(self, 'error_info', None)
                 if not error_info:
                     exc_info = sys.exc_info()
                     #raise e.__class__, e, exc_info[2]
-                    self.error_info = (e, exc_info)
+                    #self.error_info = (e, exc_info)
+                    self.error_info = exc_info
                 continue
 
         sys.path.pop(0)
@@ -198,10 +215,10 @@ class TestCaseInfo(object):
         """the partial self.class_name will be used to find actual TestCase classes"""
         for module in self.modules():
             cs = inspect.getmembers(module, inspect.isclass)
-            class_name = getattr(self, 'class_name', u'')
+            class_name = getattr(self, 'class_name', '')
             class_regex = ''
             if class_name:
-                class_regex = re.compile(ur'^{}'.format(class_name), re.I)
+                class_regex = re.compile(r'^{}'.format(class_name), re.I)
 
             for c_name, c in cs:
                 can_yield = True
@@ -217,16 +234,18 @@ class TestCaseInfo(object):
     def method_names(self):
         """return the actual test methods that matched self.method_name"""
         for c in self.classes():
-            ms = inspect.getmembers(c, inspect.ismethod)
-            method_name = getattr(self, 'method_name', u'')
+            #ms = inspect.getmembers(c, inspect.ismethod)
+            # http://stackoverflow.com/questions/17019949/
+            ms = inspect.getmembers(c, lambda f: inspect.ismethod(f) or inspect.isfunction(f))
+            method_name = getattr(self, 'method_name', '')
             method_regex = ''
             if method_name:
                 if method_name.startswith(self.method_prefix):
-                    method_regex = re.compile(ur'^{}'.format(method_name), re.I)
+                    method_regex = re.compile(r'^{}'.format(method_name), re.I)
 
                 else:
                     method_regex = re.compile(
-                        ur'^{}[_]{{0,1}}{}'.format(self.method_prefix, method_name),
+                        r'^{}[_]{{0,1}}{}'.format(self.method_prefix, method_name),
                         re.I
                     )
 
@@ -248,10 +267,10 @@ class TestCaseInfo(object):
 
         return -- generator
         '''
-        module_name = getattr(self, 'module_name', u'')
-        module_prefix = getattr(self, 'prefix', u'')
+        module_name = getattr(self, 'module_name', '')
+        module_prefix = getattr(self, 'prefix', '')
         basedir = self.basedir
-        filepath = getattr(self, 'filepath', u'')
+        filepath = getattr(self, 'filepath', '')
 
         if filepath:
             if os.path.isabs(filepath):
@@ -266,27 +285,27 @@ class TestCaseInfo(object):
             if module_name:
                 if module_name.startswith('test') or module_name.endswith('test'):
                     module_regex = re.compile(
-                        ur'^{}\.py$'.format(module_name),
+                        r'^{}\.py$'.format(module_name),
                         re.I
                     )
                     package_regex = re.compile(
-                        ur'^{}|{}$'.format(module_name, module_name),
+                        r'^{}|{}$'.format(module_name, module_name),
                         re.I
                     )
 
                 else:
                     module_regex = re.compile(
-                        ur'^(?:test_?{}|{}.*?_?test)\.py$'.format(module_name, module_name),
+                        r'^(?:test_?{}|{}.*?_?test)\.py$'.format(module_name, module_name),
                         re.I
                     )
                     package_regex = re.compile(
-                        ur'^(?:test_?{}|{}.*?_?test)$'.format(module_name, module_name),
+                        r'^(?:test_?{}|{}.*?_?test)$'.format(module_name, module_name),
                         re.I
                     )
 
             else:
-                module_regex = re.compile(ur'^(?:test\S+|\S+test)\.py$', re.I)
-                package_regex = re.compile(ur'^(?:test\S+|\S+test)$', re.I)
+                module_regex = re.compile(r'^(?:test\S+|\S+test)\.py$', re.I)
+                package_regex = re.compile(r'^(?:test\S+|\S+test)$', re.I)
 
             prefix_regex = ''
             if module_prefix:
@@ -308,7 +327,7 @@ class TestCaseInfo(object):
                             yield filepath
 
                     elif f.startswith("__init__") and package_regex.search(os.path.basename(root)):
-                        pmodule_regex = re.compile(ur'.py$', re.I)
+                        pmodule_regex = re.compile(r'.py$', re.I)
                         for proot, pdirs, pfiles in os.walk(root, topdown=True):
                             pdirs[:] = [d for d in dirs if d[0] != '.']
                             for pf in pfiles:
@@ -323,7 +342,7 @@ class TestCaseInfo(object):
         """given a filepath like /base/path/to/module.py this will convert it to
         path.to.module so it can be imported"""
         basedir = self.basedir
-        module_name = filepath.replace(basedir, u'', 1)
+        module_name = filepath.replace(basedir, '', 1)
         module_name = module_name.strip('\\/')
 
         # remove all dirs that don't have an __init__.py file (ie, they're not modules)
@@ -333,7 +352,7 @@ class TestCaseInfo(object):
             for x in range(module_count):
                 path_args = [basedir]
                 path_args.extend(modules[0:x + 1])
-                path_args.append(u'__init__.py')
+                path_args.append('__init__.py')
                 module_init = os.path.join(*path_args)
                 if os.path.isfile(module_init): break
 
@@ -343,10 +362,10 @@ class TestCaseInfo(object):
                     os.sep.join(modules[0:x]), module_name
                 )
 
-            module_name = u'.'.join(modules[x:])
+            module_name = '.'.join(modules[x:])
 
         # convert the remaining file path to a python module path that can be imported
-        module_name = re.sub(ur'(?:\.__init__)?\.py$', u'', module_name, flags=re.I)
+        module_name = re.sub(r'(?:\.__init__)?\.py$', '', module_name, flags=re.I)
         return module_name
 
 

@@ -2,6 +2,9 @@
 import sys
 import os
 
+from .compat import *
+
+
 DEBUG = False
 
 stderr = sys.stderr
