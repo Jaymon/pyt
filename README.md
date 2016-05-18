@@ -62,13 +62,6 @@ To run every test `pyt` can find:
 Likewise, `pyt` uses unittest conventions, so a test module should end with `_test` (eg, `foo.bar_test`) and a TestCase class should end with either `Test` or `TestCase` (eg, `BazTest`), and test methods should start with `test_` (eg, `test_che`).
 
 
-#### pyt turns on buffering and failfast by default
-
-This is the opposite of Python's normal unittest behavior, you can turn them off with `--no-buffer` and `--no-failfast` flags, respectively.
-
-The `--debug` flag is really handy, it will print out each test that pyt runs and how long it took to run it, and how many tests it will run in total.
-
-
 #### See all flags
 
 To see everything pyt can do
@@ -118,7 +111,13 @@ You can also get it directly from the repo:
     $ pip install git+https://github.com/Jaymon/pyt#egg=pyt
 
 
-## License
+## Testing
 
-MIT
+Testing in 2.7 on most systems:
+
+    $ python -m unittest pyt_test
+
+Testing in 3.5 on MacOS:
+
+    $ python3.5 -m unittest pyt_test
 
