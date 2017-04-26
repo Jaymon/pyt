@@ -37,7 +37,7 @@ kwargs = dict(
 
 if is_py2:
     kwargs['console_scripts'] = [
-        '{} = {}.__main__:console'.format(name, name)
+        '{} = {}.__main__:console'.format(name, name),
         '{}2 = {}.__main__:console'.format(name, name)
     ]
 
