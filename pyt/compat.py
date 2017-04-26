@@ -14,6 +14,7 @@ if is_py2:
     basestring = basestring
     range = xrange # range is now always an iterator
 
+    # http://stackoverflow.com/questions/14503751
     # ripped from six https://bitbucket.org/gutworth/six
     exec("""def reraise(tp, value, tb=None):
         try:
