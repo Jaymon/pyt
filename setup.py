@@ -36,15 +36,19 @@ kwargs = dict(
 )
 
 if is_py2:
-    kwargs['console_scripts'] = [
-        '{} = {}.__main__:console'.format(name, name),
-        '{}2 = {}.__main__:console'.format(name, name)
-    ]
+    kwargs['entry_points'] = {
+        'console_scripts': [
+            '{} = {}.__main__:console'.format(name, name),
+            '{}2 = {}.__main__:console'.format(name, name)
+        ]
+    }
 
 elif is_py3:
-    kwargs['console_scripts'] = [
-        '{}3 = {}.__main__:console'.format(name, name)
-    ]
+    kwargs['entry_points'] = {
+        'console_scripts': [
+            '{}3 = {}.__main__:console'.format(name, name)
+        ]
+    }
 
 setup(**kwargs)
 
