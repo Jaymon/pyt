@@ -30,7 +30,8 @@ kwargs = dict(
         'Operating System :: OS Independent',
         'Topic :: Software Development :: Testing',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.5',
+        #'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3',
     ],
     #test_suite = "test_pout",
 )
