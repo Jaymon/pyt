@@ -17,8 +17,11 @@ def console():
     parser.add_argument('names', metavar='NAME', nargs='*', default=[], help='the test(s) you want to run')
     parser.add_argument('--basedir', dest='basedir', default=os.curdir, help='run from this directory')
     parser.add_argument('--debug', "-d", dest='debug', action='store_true', help='print debugging info')
-    parser.add_argument("--version", "-V", action='version', version="%(prog)s {}".format(__version__))
-    parser.add_argument("--python", "-P", action='version', version=sys.version, help="print python version")
+    parser.add_argument(
+        "--version", "-V",
+        action='version',
+        version="%(prog)s {}, Python {}".format(__version__, sys.version)
+    )
     parser.add_argument('--all', "-a", dest='run_all', action='store_true', help='run all tests with buffer')
     #parser.add_argument('--fad', dest='daf', action='store_true', help='run with --all --no-faifast --debug')
 
