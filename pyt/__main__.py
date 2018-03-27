@@ -26,11 +26,6 @@ def console():
             sys.executable
         )
     )
-    #parser.add_argument("-A", dest='run_all', action='store_true', help='run all tests without buffer')
-    #parser.add_argument('--fad', dest='daf', action='store_true', help='run with --all --no-faifast --debug')
-
-    #parser.add_argument('--no-failfast', dest='no_failfast', action='store_true', help='turns off fail fast')
-    #parser.add_argument('--no-buffer', dest='no_buffer', action='store_true', help='turns off buffer when more than one test is ran')
     parser.add_argument(
         '--all', "-a",
         dest='run_ball',
@@ -67,8 +62,6 @@ def console():
     if args.run_ball:
         args.names = ['']
         args.buffer = True
-#     elif args.run_all:
-#         args.names = ['']
 
     # create the singleton
     environ = tester.TestEnviron.get_instance(args)
