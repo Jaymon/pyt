@@ -10,7 +10,7 @@ import testdata
 
 # remove any global pyt
 if 'pyt' in sys.modules:
-    for k in sys.modules.keys():
+    for k in list(sys.modules.keys()):
         if k.startswith("pyt."):
             sys.modules.pop(k)
 
@@ -24,6 +24,13 @@ from pyt.compat import *
 echo.DEBUG = True
 
 
+# from testdata.client import ModuleCommand
+# 
+# class Client(ModuleCommand):
+#     def __init__(self, basedir=""):
+#         super(Client, self).__init__("pyt", cwd=basedir)
+# 
+
 class Client(object):
     """makes running a captain script nice and easy for easy testing"""
     def __init__(self, cwd):
@@ -31,7 +38,7 @@ class Client(object):
 
     def run(self, arg_str='', **options):
         #cmd = "python -m pyt --basedir={} {}".format(self.cwd, arg_str)
-        cmd = "{} -m pyt --basedir={} {}".format(os.environ["_"], self.cwd, arg_str)
+        cmd = "{} -m pyt --basedir={} {}".format(sys.executable, self.cwd, arg_str)
         expected_ret_code = options.get('code', 0)
 
         def get_output_str(output):
@@ -53,14 +60,6 @@ class Client(object):
             for line in iter(process.stdout.readline, b""):
                 output.append(line.rstrip())
 
-#             while True:
-#                 char = process.stdout.read(1)
-#                 if char == '' and process.poll() is not None:
-#                     break
-#                 #sys.stdout.write(char)
-#                 #sys.stdout.flush()
-#                 r += char.decode("utf-8")
-
             process.wait()
             if process.returncode != expected_ret_code:
                 raise RuntimeError("cmd returned {} with output: {}".format(
@@ -75,6 +74,10 @@ class Client(object):
 
 
 class TestModule(object):
+    @property
+    def client(self):
+        return Client(self.cwd)
+
     @property
     def test(self):
         t = tester.Test()
@@ -287,7 +290,7 @@ class RunTestTest(TestCase):
         r = s.run("bar che --debug")
         self.assertTrue("bar_test" in r)
         self.assertTrue("che_test" in r)
-        self.assertTrue("Ran 2 tests" in r)
+        self.assertEqual(2, r.count("Ran 1 test"))
 
     def test_buffer(self):
         m = TestModule(
@@ -442,8 +445,8 @@ class RunTestTest(TestCase):
         r = s.run('--all', code=1)
         self.assertTrue(len(r) > 0)
 
-    def test_failfast(self):
-        m = TestModule(
+    def test_failfast_1(self):
+        m = TestModule([
             "from unittest import TestCase",
             "",
             "class FailFastTestCase(TestCase):",
@@ -455,7 +458,7 @@ class RunTestTest(TestCase):
             "",
             "   def test_zoo(self):",
             "       self.assertTrue(True)",
-        )
+        ])
 
         s = Client(m.cwd)
 
@@ -464,6 +467,24 @@ class RunTestTest(TestCase):
 
         r = s.run('--all', code=1)
         self.assertTrue('.F.' in r)
+
+    def test_failfast_2(self):
+        m = TestModule([
+            "from __future__ import print_function",
+            "from unittest import TestCase",
+            "",
+            "class BarTest(TestCase):",
+            "    def test_1bar(self):",
+            "        print('in bar test')",
+            "        self.assertTrue(False)",
+            "    def test_2foo(self):",
+            "        print('in foo test')",
+        ])
+
+        s = m.client
+        r = s.run("-fb", code=1)
+        self.assertTrue("FAIL: test_1bar" in r)
+        self.assertTrue("Ran 1 test" in r)
 
     def test_parse_error(self):
         cwd = testdata.create_dir()
@@ -713,7 +734,7 @@ class RunTestTest(TestCase):
         ret_code = tester.run_test('pmod', m.cwd)
         self.assertEqual(0, ret_code)
 
-    def test_names(self):
+    def test_names_1(self):
         m = TestModule(
             "from unittest import TestCase",
             "",
@@ -730,6 +751,23 @@ class RunTestTest(TestCase):
 
         ret_code = tester.run_test('', m.cwd)
         self.assertEqual(0, ret_code)
+
+    def test_names_2(self):
+        m = TestModule([
+            "from __future__ import print_function",
+            "from unittest import TestCase",
+            "",
+            "class Names2Test(TestCase):",
+            "    def test_1name(self):",
+            "        print('test 1')",
+            "",
+            "    def test_2name(self):",
+            "        print('test 2')",
+        ])
+
+        s = m.client
+        r = s.run("Names2.1name Names2.2name")
+        self.assertEqual(2, r.count("Ran 1 test"))
 
 
 class TestLoaderTest(TestCase):

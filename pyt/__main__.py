@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import sys
+import platform
 import argparse
 import os
 
@@ -16,28 +17,58 @@ def console():
     parser = argparse.ArgumentParser(description='Easy Python Testing')
     parser.add_argument('names', metavar='NAME', nargs='*', default=[], help='the test(s) you want to run')
     parser.add_argument('--basedir', dest='basedir', default=os.curdir, help='run from this directory')
-    parser.add_argument('--debug', "-d", dest='debug', action='store_true', help='print debugging info')
     parser.add_argument(
         "--version", "-V",
         action='version',
-        version="%(prog)s {}, Python {}".format(__version__, sys.version)
+        version="%(prog)s {}, Python {} ({})".format(
+            __version__,
+            platform.python_version(),
+            sys.executable
+        )
     )
-    parser.add_argument('--all', "-a", dest='run_all', action='store_true', help='run all tests with buffer')
+    #parser.add_argument("-A", dest='run_all', action='store_true', help='run all tests without buffer')
     #parser.add_argument('--fad', dest='daf', action='store_true', help='run with --all --no-faifast --debug')
 
-    # https://docs.python.org/2/library/unittest.html#command-line-options
     #parser.add_argument('--no-failfast', dest='no_failfast', action='store_true', help='turns off fail fast')
     #parser.add_argument('--no-buffer', dest='no_buffer', action='store_true', help='turns off buffer when more than one test is ran')
-    parser.add_argument('--buffer', "-b", dest='buffer', action='store_true', help='Buffer stdout and stderr during test runs')
+    parser.add_argument(
+        '--all', "-a",
+        dest='run_ball',
+        action='store_true',
+        help='run all tests with buffer'
+    )
+    parser.add_argument(
+        '--debug', "-d",
+        dest='debug',
+        action='store_true',
+        help='print debugging info'
+    )
+    parser.add_argument(
+        '--buffer', "-b",
+        dest='buffer',
+        action='store_true',
+        help='Buffer stdout and stderr during test runs'
+    )
+    parser.add_argument(
+        '--failfast', "-f",
+        dest='failfast',
+        action='store_true',
+        help='Stop running tests on first encountered failure'
+    )
 
     args, test_args = parser.parse_known_args()
 
+    # https://docs.python.org/2/library/unittest.html#command-line-options
     test_args.insert(0, sys.argv[0])
+    if args.failfast:
+        test_args.append("--failfast")
     ret_code = 0
 
-    if args.run_all:
+    if args.run_ball:
         args.names = ['']
         args.buffer = True
+#     elif args.run_all:
+#         args.names = ['']
 
     # create the singleton
     environ = tester.TestEnviron.get_instance(args)

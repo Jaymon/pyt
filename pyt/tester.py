@@ -564,7 +564,7 @@ def run_test(name, basedir, **kwargs):
     tl = TestLoader(basedir, environ)
 
     kwargs.setdefault('argv', ['run_test'])
-    kwargs['argv'].append(name)
+    kwargs['argv'] = kwargs['argv'] + [name]
 
     kwargs.setdefault('exit', False)
     kwargs.setdefault('testLoader', tl)
