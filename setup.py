@@ -4,19 +4,29 @@ import re
 import os
 import sys
 
+
 _ver = sys.version_info
 is_py2 = (_ver[0] == 2)
 is_py3 = (_ver[0] == 3)
 
-name = 'pyt'
-with open(os.path.join(name, "__init__.py")) as f:
-    version = re.search("^__version__\s*=\s*[\'\"]([^\'\"]+)", f.read(), flags=re.I | re.M).group(1)
 
+def read(path):
+    if os.path.isfile(path):
+        with open(path, encoding='utf-8') as f:
+            return f.read()
+    return ""
+
+
+name = 'pyt'
+vpath = os.path.join(name, "__init__.py")
+version = re.search("^__version__\s*=\s*[\'\"]([^\'\"]+)", read(vpath), flags=re.I | re.M).group(1)
+long_description = read('README.rst')
 
 kwargs = dict(
     name=name,
     version=version,
     description='easily run python unit tests',
+    long_description=long_description,
     author='Jay Marcyes',
     author_email='jay@marcyes.com',
     url='http://github.com/Jaymon/{}'.format(name),
