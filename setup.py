@@ -3,6 +3,7 @@ from setuptools import setup, find_packages
 import re
 import os
 import sys
+from codecs import open
 
 
 _ver = sys.version_info
