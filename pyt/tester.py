@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # https://docs.python.org/2/library/unittest.html
-from __future__ import unicode_literals
+from __future__ import unicode_literals, division, print_function, absolute_import
 import re
 import os
 import unittest
@@ -121,7 +121,7 @@ class TestInfo(object):
             }))
         else:
             if self.name:
-                echo.debug('name is ambiguous')
+                echo.debug('Name is ambiguous')
                 possible.append(TestCaseInfo(basedir, method_prefix, **{
                     'module_name': bits[-1],
                     'prefix': os.sep.join(bits[0:-1]),
@@ -131,6 +131,10 @@ class TestInfo(object):
                     'method_name': bits[-1],
                     'module_name': bits[-2] if len(bits) > 1 else '',
                     'prefix': os.sep.join(bits[0:-2]),
+                    'filepath': filepath,
+                }))
+                possible.append(TestCaseInfo(basedir, method_prefix, **{
+                    'prefix': os.sep.join(bits),
                     'filepath': filepath,
                 }))
 

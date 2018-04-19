@@ -9,10 +9,12 @@ import subprocess
 import testdata
 
 # remove any global pyt
-if 'pyt' in sys.modules:
-    for k in list(sys.modules.keys()):
-        if k.startswith("pyt."):
-            sys.modules.pop(k)
+# NOTE -- when I actually got rid of the modules (just the .pop() without the
+# reassignment to bak.) it caused all kinds of strange and subtle issues, but
+# only when I was running the tests with a global pyt
+for k in list(sys.modules.keys()):
+    if k.startswith("pyt.") or k == "pyt":
+        sys.modules["bak.{}".format(k)] = sys.modules.pop(k)
 
 
 import pyt
@@ -22,6 +24,7 @@ from pyt.compat import *
 
 
 echo.DEBUG = True
+testdata.basic_logging()
 
 
 # from testdata.client import ModuleCommand
@@ -796,7 +799,7 @@ class TestLoaderTest(TestCase):
         r = str(s)
         self.assertFalse("_TestCase.test_common" in r)
 
-    def test_package(self):
+    def test_package_1(self):
         basedir = testdata.create_modules({
             "packagefoo2_test": "",
             "packagefoo2_test.bar_test": [
@@ -853,6 +856,32 @@ class TestLoaderTest(TestCase):
         tl = tester.TestLoader(basedir, tester.TestEnviron())
         s = tl.loadTestsFromName("tests")
         self.assertTrue('BarTest' in str(s))
+        self.assertTrue('CheTest' in str(s))
+
+    def test_package_2(self):
+        """https://github.com/Jaymon/pyt/issues/23"""
+        basedir = testdata.create_modules({
+            "p2tests.foo.bar.baz_test": [
+                "from unittest import TestCase",
+                "class BazTest(TestCase):",
+                "   def test_foo(self): pass",
+            ],
+            "p2tests.foo.bar.boo_test": [
+                "from unittest import TestCase",
+                "class BooTest(TestCase):",
+                "   def test_foo(self): pass",
+            ],
+            "p2tests.foo.bar.che_test": [
+                "from unittest import TestCase",
+                "class CheTest(TestCase):",
+                "   def test_foo(self): pass",
+            ],
+        })
+
+        tl = tester.TestLoader(basedir, tester.TestEnviron())
+        s = tl.loadTestsFromName("foo.bar")
+        self.assertTrue('BazTest' in str(s))
+        self.assertTrue('BooTest' in str(s))
         self.assertTrue('CheTest' in str(s))
 
     def test_suite(self):
