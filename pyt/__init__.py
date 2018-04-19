@@ -26,11 +26,6 @@ def get_counts():
 
     return counts
 
-#     if 'PYT_TEST_CLASS_COUNT' in os.environ:
-#         pyt_cls_count = int(os.environ['PYT_TEST_CLASS_COUNT'])
-#         pyt_test_count = int(os.environ['PYT_TEST_COUNT'])
-#         pyt_mod_count = int(os.environ['PYT_TEST_MODULE_COUNT'])
-
 
 def is_single_class():
     """Returns True if only a class is being run"""
@@ -55,7 +50,6 @@ def is_single_module():
         ret = is_single_class()
 
     return ret
-    #return counts["modules"] == 1
 
 
 def skip_multi_module(msg=""):
@@ -75,16 +69,4 @@ def skip_multi_test(msg=""):
     counts = get_counts()
     if not is_single_test():
         raise SkipTest(msg)
-
-#     if counts["classes"] == 1:
-#         skip = False
-# 
-#     elif counts["tests"] == 1:
-#         skip = False
-# 
-#     elif counts["modules"] == 1:
-#         skip = False
-# 
-#     if skip:
-#         raise SkipTest(msg)
 

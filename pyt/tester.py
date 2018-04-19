@@ -179,19 +179,6 @@ class TestCaseInfo(object):
 
             reraise(*error_info)
 
-#             if py_2:
-#                 #raise error_info[0].__class__, error_info[0], error_info[1][2]
-#                 reraise(*error_info)
-#                 #raise error_info[0].__class__, error_info[1], error_info[2]
-# 
-#             elif py_3:
-#                 #e, exc_info = error_info
-#                 #et, ei, tb = exc_info
-# 
-#                 reraise(*error_info)
-#                 #et, ei, tb = error_info
-#                 #raise ei.with_traceback(tb)
-
     def modules(self):
         """return modules that match module_name"""
         # this is a hack because I couldn't get imp.load_source to work right

@@ -7,6 +7,7 @@ import sys
 import subprocess
 
 import testdata
+from testdata.client import ModuleCommand
 
 # remove any global pyt
 # NOTE -- when I actually got rid of the modules (just the .pop() without the
@@ -27,8 +28,6 @@ echo.DEBUG = True
 testdata.basic_logging()
 
 
-from testdata.client import ModuleCommand
-
 class Client(ModuleCommand):
     @property
     def environ(self):
@@ -47,48 +46,6 @@ class Client(ModuleCommand):
         else:
             arg_str = prefix_arg_str
         return super(Client, self).create_cmd(arg_str)
-
-
-# class Client(object):
-#     """makes running a captain script nice and easy for easy testing"""
-#     def __init__(self, cwd):
-#         self.cwd = cwd
-# 
-#     def run(self, arg_str='', **options):
-#         #cmd = "python -m pyt --basedir={} {}".format(self.cwd, arg_str)
-#         cmd = "{} -m pyt --basedir={} {}".format(sys.executable, self.cwd, arg_str)
-#         expected_ret_code = options.get('code', 0)
-# 
-#         def get_output_str(output):
-#             if is_py2:
-#                 return "\n".join(output)
-#             elif is_py3:
-#                 return "\n".join((o.decode("utf-8") for o in output))
-# 
-#         output = []
-#         try:
-#             process = subprocess.Popen(
-#                 cmd,
-#                 shell=True,
-#                 stdout=subprocess.PIPE,
-#                 stderr=subprocess.STDOUT,
-#                 cwd=os.curdir
-#             )
-# 
-#             for line in iter(process.stdout.readline, b""):
-#                 output.append(line.rstrip())
-# 
-#             process.wait()
-#             if process.returncode != expected_ret_code:
-#                 raise RuntimeError("cmd returned {} with output: {}".format(
-#                     process.returncode,
-#                     get_output_str(output)
-#                 ))
-# 
-#         except subprocess.CalledProcessError as e:
-#             raise RuntimeError("cmd returned {} with output: {}".format(e.returncode, e.output))
-# 
-#         return get_output_str(output)
 
 
 class TestModule(object):
