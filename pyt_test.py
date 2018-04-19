@@ -27,53 +27,68 @@ echo.DEBUG = True
 testdata.basic_logging()
 
 
-# from testdata.client import ModuleCommand
-# 
-# class Client(ModuleCommand):
-#     def __init__(self, basedir=""):
-#         super(Client, self).__init__("pyt", cwd=basedir)
-# 
+from testdata.client import ModuleCommand
 
-class Client(object):
-    """makes running a captain script nice and easy for easy testing"""
+class Client(ModuleCommand):
+    @property
+    def environ(self):
+        environ = super(Client, self).environ
+        if os.getcwd() not in environ["PYTHONPATH"]:
+            environ["PYTHONPATH"] = os.getcwd() + os.pathsep + environ["PYTHONPATH"]
+        return environ
+
     def __init__(self, cwd):
-        self.cwd = cwd
+        super(Client, self).__init__("pyt", cwd=cwd)
 
-    def run(self, arg_str='', **options):
-        #cmd = "python -m pyt --basedir={} {}".format(self.cwd, arg_str)
-        cmd = "{} -m pyt --basedir={} {}".format(sys.executable, self.cwd, arg_str)
-        expected_ret_code = options.get('code', 0)
+    def create_cmd(self, arg_str):
+        prefix_arg_str = '--basedir="{}"'.format(self.cwd)
+        if arg_str:
+            arg_str = prefix_arg_str + " " + arg_str
+        else:
+            arg_str = prefix_arg_str
+        return super(Client, self).create_cmd(arg_str)
 
-        def get_output_str(output):
-            if is_py2:
-                return "\n".join(output)
-            elif is_py3:
-                return "\n".join((o.decode("utf-8") for o in output))
 
-        output = []
-        try:
-            process = subprocess.Popen(
-                cmd,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                cwd=os.curdir
-            )
-
-            for line in iter(process.stdout.readline, b""):
-                output.append(line.rstrip())
-
-            process.wait()
-            if process.returncode != expected_ret_code:
-                raise RuntimeError("cmd returned {} with output: {}".format(
-                    process.returncode,
-                    get_output_str(output)
-                ))
-
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError("cmd returned {} with output: {}".format(e.returncode, e.output))
-
-        return get_output_str(output)
+# class Client(object):
+#     """makes running a captain script nice and easy for easy testing"""
+#     def __init__(self, cwd):
+#         self.cwd = cwd
+# 
+#     def run(self, arg_str='', **options):
+#         #cmd = "python -m pyt --basedir={} {}".format(self.cwd, arg_str)
+#         cmd = "{} -m pyt --basedir={} {}".format(sys.executable, self.cwd, arg_str)
+#         expected_ret_code = options.get('code', 0)
+# 
+#         def get_output_str(output):
+#             if is_py2:
+#                 return "\n".join(output)
+#             elif is_py3:
+#                 return "\n".join((o.decode("utf-8") for o in output))
+# 
+#         output = []
+#         try:
+#             process = subprocess.Popen(
+#                 cmd,
+#                 shell=True,
+#                 stdout=subprocess.PIPE,
+#                 stderr=subprocess.STDOUT,
+#                 cwd=os.curdir
+#             )
+# 
+#             for line in iter(process.stdout.readline, b""):
+#                 output.append(line.rstrip())
+# 
+#             process.wait()
+#             if process.returncode != expected_ret_code:
+#                 raise RuntimeError("cmd returned {} with output: {}".format(
+#                     process.returncode,
+#                     get_output_str(output)
+#                 ))
+# 
+#         except subprocess.CalledProcessError as e:
+#             raise RuntimeError("cmd returned {} with output: {}".format(e.returncode, e.output))
+# 
+#         return get_output_str(output)
 
 
 class TestModule(object):
@@ -103,17 +118,12 @@ class TestModule(object):
         return tc
 
     def __init__(self, *body, **kwargs):
-        if len(body) == 1: body = body[0]
-
-        self.body = body
-        if not isinstance(body, basestring):
-            self.body = "\n".join(body)
-
         self.cwd = testdata.create_dir()
 
         name = kwargs.get('name', '')
         if name:
             self.name = name
+
         else:
             self.name = "prefix{}.pmod{}_test".format(
                 testdata.get_ascii(5),
@@ -125,11 +135,21 @@ class TestModule(object):
         self.prefix = bits[0] if len(bits) == 2 else ''
         self.name_prefix = bits[1][:4] if len(bits) == 2 else bits[0][:4]
 
-        self.path = testdata.create_module(
-            self.name,
-            self.body,
-            self.cwd
-        )
+        if len(body) == 1: body = body[0]
+        self.body = body
+        if isinstance(body, dict):
+            self.path = testdata.create_modules(
+                self.body,
+                self.cwd,
+                prefix=self.name,
+            )
+
+        else:
+            self.path = testdata.create_module(
+                self.name,
+                self.body,
+                self.cwd
+            )
 
 
 class TestCaseInfoTest(TestCase):
@@ -323,7 +343,7 @@ class RunTestTest(TestCase):
         self.assertTrue("in bar test" in r)
 
     def test_filepath(self):
-        m = testdata.create_module("bar.foo_test", [
+        m = testdata.create_module("foo_test", [
             "from unittest import TestCase",
             "class FooTest(TestCase):",
             "    def test_foo(self):",
@@ -352,7 +372,7 @@ class RunTestTest(TestCase):
         r = s.run("foo_test")
         self.assertTrue("in foo test" in r)
 
-    def test_environ(self):
+    def test_environ_1(self):
         m = TestModule(
             "import os",
             "from unittest import TestCase",
@@ -380,6 +400,62 @@ class RunTestTest(TestCase):
             r = s.run('Foo --debug')
 
         r = s.run('pmod --debug')
+
+    def test_environ_2(self):
+        m = TestModule({
+            "foo_test": [
+                "from unittest import TestCase",
+                "import pyt",
+                "",
+                "def setUpModule():",
+                "    counts = pyt.get_counts()",
+                "    for k, n in counts.items():",
+                "        print('{}: {}'.format(k, n))",
+                "",
+                "class FooTest(TestCase):",
+                "    def test_one_class(self):",
+                "        pyt.skip_multi_class('one_class')",
+                "    def test_one_module(self):",
+                "        pyt.skip_multi_module('one_module')",
+            ],
+            "bar_test": [
+                "from unittest import TestCase",
+                "import pyt",
+                "",
+                "def setUpModule():",
+                "    pyt.skip_multi_module('bar_module')",
+                "",
+                "class BarTest(TestCase):",
+                "    def test_one(self):",
+                "        pyt.skip_multi_test('one_test')",
+                "    def test_two(self):",
+                "        #print(pyt.get_counts())",
+                "        pass",
+                "",
+            ],
+        })
+        c = m.client
+
+        # running one class
+        r = c.run('bar.Bar --debug')
+        self.assertTrue("bar_test.BarTest.test_one" in r)
+        self.assertTrue("bar_test.BarTest.test_two" in r)
+        self.assertTrue("Ran 2 tests" in r)
+
+        # running one test
+        r = c.run('bar.Bar.one --debug', code=1)
+        self.assertTrue("skipped=1" in r)
+
+        # running modules
+        r = c.run('{} --debug'.format(m.name))
+        self.assertTrue("skipped=3" in r)
+
+        # running one module
+        r = c.run('bar --debug')
+        self.assertTrue("bar_test.BarTest.test_one" in r)
+        self.assertTrue("bar_test.BarTest.test_two" in r)
+        self.assertTrue("Ran 2 tests" in r)
+        self.assertTrue("skipped=1" in r)
 
     def test_debug(self):
         m = TestModule(
