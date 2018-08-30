@@ -41,7 +41,6 @@ kwargs = dict(
         'Operating System :: OS Independent',
         'Topic :: Software Development :: Testing',
         'Programming Language :: Python :: 2.7',
-        #'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3',
     ],
     #test_suite = "test_pout",
@@ -55,9 +54,10 @@ if is_py2:
         ]
     }
 
-elif is_py3:
+else:
     kwargs['entry_points'] = {
         'console_scripts': [
+            '{} = {}.__main__:console'.format(name, name),
             '{}3 = {}.__main__:console'.format(name, name)
         ]
     }
