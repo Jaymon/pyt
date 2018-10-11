@@ -65,7 +65,14 @@ class TestEnviron(object):
         os.environ['PYT_TEST_MODULE_COUNT'] = str(self.counter["modules"])
 
 
-class TestInfo(object):
+class PathGuesser(object):
+    """PathGuesser
+
+    This class compiles the possible paths, it is created in the TestLoader and then 
+    the .possible attribute is iterated to actually load the tests.
+
+    The .possible property consists of PathFinder objects
+    """
     def __init__(self, name, basedir, method_prefix='test', **kwargs):
         self.name = name
         self.basedir = basedir
@@ -73,7 +80,7 @@ class TestInfo(object):
         self.set_possible()
 
     def raise_any_error(self):
-        """raise any found error in the possible TestCaseInfos"""
+        """raise any found error in the possible PathFinders"""
         for tc in self.possible:
             tc.raise_found_error()
 
@@ -104,7 +111,7 @@ class TestInfo(object):
         # check if the last bit is a Class
         if re.search(r'^[A-Z]', bits[-1]):
             echo.debug('Found class in name: {}', bits[-1])
-            possible.append(TestCaseInfo(basedir, method_prefix, **{
+            possible.append(PathFinder(basedir, method_prefix, **{
                 'class_name': bits[-1],
                 'module_name': bits[-2] if len(bits) > 1 else '',
                 'prefix': os.sep.join(bits[0:-2]),
@@ -112,7 +119,7 @@ class TestInfo(object):
             }))
         elif len(bits) > 1 and re.search(r'^[A-Z]', bits[-2]):
             echo.debug('Found class in name: {}', bits[-2])
-            possible.append(TestCaseInfo(basedir, method_prefix, **{
+            possible.append(PathFinder(basedir, method_prefix, **{
                 'class_name': bits[-2],
                 'method_name': bits[-1],
                 'module_name': bits[-3] if len(bits) > 2 else '',
@@ -122,32 +129,40 @@ class TestInfo(object):
         else:
             if self.name:
                 echo.debug('Name is ambiguous')
-                possible.append(TestCaseInfo(basedir, method_prefix, **{
+                possible.append(PathFinder(basedir, method_prefix, **{
                     'module_name': bits[-1],
                     'prefix': os.sep.join(bits[0:-1]),
                     'filepath': filepath,
                 }))
-                possible.append(TestCaseInfo(basedir, method_prefix, **{
+                possible.append(PathFinder(basedir, method_prefix, **{
                     'method_name': bits[-1],
                     'module_name': bits[-2] if len(bits) > 1 else '',
                     'prefix': os.sep.join(bits[0:-2]),
                     'filepath': filepath,
                 }))
-                possible.append(TestCaseInfo(basedir, method_prefix, **{
+                possible.append(PathFinder(basedir, method_prefix, **{
                     'prefix': os.sep.join(bits),
                     'filepath': filepath,
                 }))
 
             else:
-                possible.append(TestCaseInfo(basedir, method_prefix, filepath=filepath))
+                possible.append(PathFinder(basedir, method_prefix, filepath=filepath))
 
         self.possible = possible
 
 
-class TestCaseInfo(object):
+class PathFinder(object):
+    """Pathfinder class
+
+    this is where all the magic happens, PathGuesser guesses on what the paths might
+    be and creates instances of this class, those instances then actually validate
+    the guesses and allow the tests to be loaded or not
+    """
     def __init__(self, basedir, method_prefix='test', **kwargs):
         self.basedir = basedir
         self.method_prefix = method_prefix
+        self.module_prefixes = ["test_", "test"]
+        self.module_postfixes = ["_test", "test", "_tests", "tests"]
         for k, v in kwargs.items():
             setattr(self, k, v)
 
@@ -251,7 +266,231 @@ class TestCaseInfo(object):
                     echo.debug('method: {}', m_name)
                     yield c, m_name
 
+    def _find_basename(self, name, basenames, is_prefix=False):
+        ret = ""
+        fileroots = [(os.path.splitext(n)[0], n) for n in basenames]
+
+        for fileroot, basename in fileroots:
+            if name in fileroot or fileroot in name:
+                for pf in self.module_postfixes:
+                    echo.debug(
+                        'Checking if basename {} starts with {} and ends with {}',
+                        basename,
+                        name,
+                        pf
+                    )
+                    if fileroot.startswith(name) and fileroot.endswith(pf):
+                        ret = basename
+                        break
+
+                if not ret:
+                    for pf in self.module_prefixes:
+                        n = pf + name
+                        echo.debug('Checking if basename {} starts with {}', basename, n)
+                        if fileroot.startswith(n):
+                            ret = basename
+                            break
+
+                if not ret:
+                    if is_prefix:
+                        echo.debug('Checking if basename {} starts with {}', basename, name)
+                        if basename.startswith(name):
+                            ret = basename
+
+                        else:
+                            echo.debug(
+                                'Checking if basename {} starts with {} and is a test module',
+                                basename,
+                                name
+                            )
+                            if basename.startswith(name) and self._is_module_path(basename):
+                                ret = basename
+
+                if ret:
+                    echo.debug('Found basename {}', ret)
+                    break
+
+        return ret
+
+    def _find_prefix_path(self, basedir, prefix):
+        ret = basedir
+        modnames = re.split(r"[\.\/]", prefix)
+        for modname in modnames:
+            for root, dirs, files in self.walk(ret):
+                ret = ""
+                basename = self._find_basename(modname, dirs, is_prefix=True)
+                if basename:
+                    ret = os.path.join(root, basename)
+                    break
+
+            if not ret:
+                raise IOError("Could not find a prefix path with {}".format(modname))
+
+        echo.debug("Found prefix path {}", ret)
+        return ret
+
+    def _find_module_path(self, basedir, modname):
+        ret = ""
+
+        try:
+            ret = self._find_prefix_path(basedir, modname)
+
+        except IOError:
+            echo.debug('Checking for a module that matches {} in {}', modname, basedir)
+            for root, dirs, files in self.walk(basedir):
+                basename = self._find_basename(modname, files, is_prefix=False)
+                if basename:
+                    ret = os.path.join(root, basename)
+                    break
+
+
+
+                for basename in files:
+                    fileroot = os.path.splitext(basename)[0]
+                    if fileroot in modname or modname in fileroot:
+                        for pf in self.module_postfixes:
+                            n = modname + pf
+                            echo.debug('Checking {} against {}', n, fileroot)
+                            if fileroot.startswith(n):
+                                ret = os.path.join(root, basename)
+                                break
+
+                        if not ret:
+                            for pf in self.module_prefixes:
+                                n = pf + modname
+                                echo.debug('Checking {} against {}', n, fileroot)
+                                if fileroot.startswith(n):
+                                    ret = os.path.join(root, basename)
+                                    break
+
+                        if not ret:
+                            if self._is_module_path(basename) and modname == basename:
+                                ret = os.path.join(root, basename)
+                                break
+
+                    if ret: break
+                if ret: break
+
+        if not ret:
+            raise IOError("Could not find a module path with {}".format(modname))
+
+        echo.debug("Found module path {}", ret)
+        return ret
+
+    def _is_module_path(self, path):
+        """Returns true if the passed in path is a test module path
+
+        :param path: string, the path to check, will need to start or end with the
+            module test prefixes or postfixes to be considered valid
+        :returns: boolean, True if a test module path, False otherwise
+        """
+        ret = False
+        basename = os.path.basename(path)
+        fileroot = os.path.splitext(basename)[0]
+        for pf in self.module_postfixes:
+            if fileroot.endswith(pf):
+                ret = True
+                break
+
+        if not ret:
+            for pf in self.module_prefixes:
+                if fileroot.startswith(pf):
+                    ret = True
+                    break
+        return ret
+
+
+
+    def walk(self, basedir):
+        """Walk all the directories of basedir except hidden directories
+
+        :param basedir: string, the directory to walk
+        :returns: generator, same as os.walk
+        """
+        for root, dirs, files in os.walk(basedir, topdown=True):
+            dirs[:] = [d for d in dirs if d[0] != '.'] # ignore dot directories
+            yield root, dirs, files
+
     def paths(self):
+        '''
+        given a basedir, yield all test modules paths recursively found in
+        basedir that are test modules
+
+        return -- generator
+        '''
+        module_name = getattr(self, 'module_name', '')
+        module_prefix = getattr(self, 'prefix', '')
+        basedir = self.basedir
+        filepath = getattr(self, 'filepath', '')
+
+        try:
+            if filepath:
+                if os.path.isabs(filepath):
+                    yield filepath
+
+                else:
+                    yield os.path.join(basedir, filepath)
+
+            else:
+                if module_prefix:
+                    basedir = self._find_prefix_path(basedir, module_prefix)
+
+                if module_name:
+                    path = self._find_module_path(basedir, module_name)
+
+                else:
+                    path = basedir
+
+                if os.path.isfile(path):
+                    echo.debug('Module path: {}', path)
+                    yield path
+
+                else:
+                    seen_paths = set()
+                    for root, dirs, files in self.walk(path):
+                        for basename in files:
+                            if basename.startswith("__init__"):
+                                if self._is_module_path(root):
+                                    filepath = os.path.join(root, basename)
+                                    if filepath not in seen_paths:
+                                        echo.debug('Module package path: {}', filepath)
+                                        seen_paths.add(filepath)
+                                        yield filepath
+
+                            else:
+                                fileroot = os.path.splitext(basename)[0]
+                                for pf in self.module_postfixes:
+                                    if fileroot.endswith(pf):
+                                        filepath = os.path.join(root, basename)
+                                        if filepath not in seen_paths:
+                                            echo.debug('Module postfix path: {}', filepath)
+                                            seen_paths.add(filepath)
+                                            yield filepath
+
+                                for pf in self.module_prefixes:
+                                    if fileroot.startswith(pf):
+                                        filepath = os.path.join(root, basename)
+                                        if filepath not in seen_paths:
+                                            echo.debug('Module prefix path: {}', filepath)
+                                            seen_paths.add(filepath)
+                                            yield filepath
+
+        except IOError as e:
+            # we failed to find a suitable path
+            echo.debug(e)
+            pass
+
+#             import pkgutil
+#             it = pkgutil.walk_packages(path=[path], prefix="")
+#             for importer, modname, ispkg in it:
+#                 pout.v(importer, modname, ispkg)
+
+
+
+
+
+
+    def paths2(self):
         '''
         given a basedir, yield all test modules paths recursively found in
         basedir that are test modules
@@ -305,6 +544,7 @@ class TestCaseInfo(object):
 
             seen_paths = set()
             for root, dirs, files in os.walk(basedir, topdown=True):
+                pout.v(root)
                 dirs[:] = [d for d in dirs if d[0] != '.'] # ignore dot directories
                 if prefix_regex:
                     if not prefix_regex.search(root): continue
@@ -411,7 +651,7 @@ class TestLoader(unittest.TestLoader):
 
     def loadTestsFromName(self, name, *args, **kwargs):
         ts = self.suiteClass()
-        ti = TestInfo(name, self.basedir, self.testMethodPrefix)
+        ti = PathGuesser(name, self.basedir, self.testMethodPrefix)
         found = False
         for i, tc in enumerate(ti.possible, 1):
             echo.debug("{}. Searching for tests matching:", i)

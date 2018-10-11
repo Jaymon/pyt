@@ -48,5 +48,9 @@ def debug(format_str, *args, **kwargs):
     global DEBUG
     global stddbg
     if DEBUG:
-        _write_str(_build_str(format_str, *args, **kwargs), stddbg)
+        try:
+            _write_str(_build_str(format_str, *args, **kwargs), stddbg)
+        except Exception as e:
+            pout.v(e)
+            raise
 

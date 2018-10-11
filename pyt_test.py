@@ -63,16 +63,18 @@ class TestModule(object):
     def tl(self):
         tl = tester.TestLoader(self.cwd, tester.TestEnviron())
         return tl
+    loader = tl
 
     @property
     def tci(self):
-        """return a TestCaseInfo instance for this module"""
-        tc = tester.TestCaseInfo(
+        """return a PathFinder instance for this module"""
+        tc = tester.PathFinder(
             self.cwd,
             module_name=self.module_name, 
             prefix=self.prefix
         )
         return tc
+    pathfinder = tci
 
     def __init__(self, *body, **kwargs):
         self.cwd = testdata.create_dir()
@@ -109,7 +111,99 @@ class TestModule(object):
             )
 
 
-class TestCaseInfoTest(TestCase):
+class PathFinderTest(TestCase):
+#     def test_prefix_searching(self):
+#         path = testdata.create_modules({
+#             "foo2_test": [
+#                 "from unittest import TestCase",
+#                 "",
+#                 "class PrefixSearchingCase(TestCase):",
+#                 "   def test_search(self):",
+#                 "       pass",
+#             ]
+#         })
+# 
+#         pf = tester.PathFinder(
+#             basedir=path,
+#             method_prefix="test",
+#             module_name="foo",
+#             prefix="",
+#             filepath="",
+#         )
+#         pout.v(list(pf.paths()))
+
+    def test__find_basename(self):
+        pf = tester.PathFinder(basedir="/does/not/matter")
+        r = pf._find_basename("foo", ["foo2_test"])
+        self.assertEqual("foo2_test", r)
+
+        r = pf._find_basename("foo2", ["foo2_test"])
+        self.assertEqual("foo2_test", r)
+
+        r = pf._find_basename("fo", ["foo2_test.py", "bar_test.py"])
+        self.assertEqual("foo2_test.py", r)
+
+    def test_issue_26(self):
+        path = testdata.create_modules({
+            "foo_test": [],
+            "foo_test.bar": [],
+            "foo_test.bar.che_test": [
+                "from unittest import TestCase",
+                "",
+                "class Issue26TestCase(TestCase):",
+                "   def test_boo(self):",
+                "       pass",
+            ]
+        })
+
+        pf = tester.PathFinder(
+            basedir=path,
+            method_prefix="test",
+            module_name="che",
+            prefix="foo/bar",
+            filepath="",
+        )
+        self.assertEqual(1, len(list(pf.paths())))
+
+        pf = tester.PathFinder(
+            basedir=path,
+            method_prefix="test",
+            module_name="foo",
+            prefix="",
+            filepath="",
+        )
+        self.assertEqual(2, len(list(pf.paths())))
+
+        pf = tester.PathFinder(
+            basedir=path,
+            method_name="boo",
+            class_name="Issue26",
+            method_prefix="test",
+            module_name="bar",
+            prefix="foo_test",
+            filepath="",
+        )
+        ti = tester.PathGuesser("foo_test.bar.Issue26.boo", path)
+        self.assertEqual("test_boo", list(pf.method_names())[0][1])
+
+        pf = tester.PathFinder(
+            basedir=path,
+            method_prefix="test",
+            module_name="bar",
+            prefix="foo",
+            filepath="",
+        )
+        self.assertEqual(1, len(list(pf.paths())))
+
+
+
+        #pout.v(list(pf.paths()))
+        #pout.v(pf)
+#         return
+# 
+#         ti = tester.PathGuesser("foo.bar", path)
+#         pout.v(ti.possible)
+
 
     def test_method_names(self):
         m = TestModule(
@@ -167,36 +261,56 @@ class TestCaseInfoTest(TestCase):
         self.assertEqual(1, len(cs))
 
 
-class TestInfoTest(TestCase):
+class PathGuesserTest(TestCase):
     def test_filename(self):
-        ti = tester.TestInfo("foo/bar/che.py", '/tmp')
+        ti = tester.PathGuesser("foo/bar/che.py", '/tmp')
         self.assertEqual("/tmp/foo/bar/che.py", list(ti.possible[0].paths())[0])
 
-        ti = tester.TestInfo("/foo/bar/che.py", '/tmp')
+        ti = tester.PathGuesser("/foo/bar/che.py", '/tmp')
         self.assertEqual("/foo/bar/che.py", list(ti.possible[0].paths())[0])
 
     def test_set_possible(self):
         tests = (
-            ('foo.bar', [{'module_name': 'bar', 'prefix': 'foo'}, {'method_name': 'bar', 'module_name': 'foo', 'prefix': ''}]),
-            ('foo.Bar', [{'module_name': 'foo', 'class_name': 'Bar', 'prefix': ''}]),
-            ('foo.Bar.baz', [{'module_name': 'foo', 'class_name': 'Bar', 'prefix': '', 'method_name': 'baz'}]),
-            ('prefix.foo.Bar.baz', [{'module_name': 'foo', 'class_name': 'Bar', 'prefix': 'prefix', 'method_name': 'baz'}]),
-            ('pre.fix.foo.Bar.baz', [{'module_name': 'foo', 'class_name': 'Bar', 'prefix': 'pre/fix', 'method_name': 'baz'}]),
-            ('Call.controller', [{'class_name': 'Call', 'method_name': 'controller', 'prefix': '', 'module_name': ''}]),
-            ('Call', [{'class_name': 'Call', 'prefix': '', 'module_name': ''}]),
-            ('Boom.fooBar', [{'class_name': 'Boom', 'prefix': '', 'module_name': '', 'method_name': 'fooBar'}]),
-            ('get_SQL', [{'module_name': 'get_SQL', 'prefix': ''}, {'method_name': 'get_SQL', 'module_name': '', 'prefix': ''}]),
+            ('foo.bar', [
+                {'module_name': 'bar', 'prefix': 'foo'},
+                {'method_name': 'bar', 'module_name': 'foo', 'prefix': ''}
+            ]),
+            ('foo.Bar', [
+                {'module_name': 'foo', 'class_name': 'Bar', 'prefix': ''}
+            ]),
+            ('foo.Bar.baz', [
+                {'module_name': 'foo', 'class_name': 'Bar', 'prefix': '', 'method_name': 'baz'}
+            ]),
+            ('prefix.foo.Bar.baz', [
+                {'module_name': 'foo', 'class_name': 'Bar', 'prefix': 'prefix', 'method_name': 'baz'}
+            ]),
+            ('pre.fix.foo.Bar.baz', [
+                {'module_name': 'foo', 'class_name': 'Bar', 'prefix': 'pre/fix', 'method_name': 'baz'}
+            ]),
+            ('Call.controller', [
+                {'class_name': 'Call', 'method_name': 'controller', 'prefix': '', 'module_name': ''}
+            ]),
+            ('Call', [
+                {'class_name': 'Call', 'prefix': '', 'module_name': ''}
+            ]),
+            ('Boom.fooBar', [
+                {'class_name': 'Boom', 'prefix': '', 'module_name': '', 'method_name': 'fooBar'}
+            ]),
+            ('get_SQL', [
+                {'module_name': 'get_SQL', 'prefix': ''},
+                {'method_name': 'get_SQL', 'module_name': '', 'prefix': ''}
+            ]),
         )
 
         for test_in, test_out in tests:
-            ti = tester.TestInfo(test_in, '/tmp')
+            ti = tester.PathGuesser(test_in, '/tmp')
             for i, to in enumerate(test_out):
                 for k, v in to.items():
                     r = getattr(ti.possible[i], k)
                     self.assertEqual(v, r)
 
     def test_no_name(self):
-        ti = tester.TestInfo('', '/tmp')
+        ti = tester.PathGuesser('', '/tmp')
         self.assertEqual(1, len(ti.possible))
 
 
@@ -300,7 +414,7 @@ class RunTestTest(TestCase):
         self.assertTrue("in bar test" in r)
 
     def test_filepath(self):
-        m = testdata.create_module("foo_test", [
+        m = testdata.create_module("filepath_test", [
             "from unittest import TestCase",
             "class FooTest(TestCase):",
             "    def test_foo(self):",
@@ -723,7 +837,7 @@ class RunTestTest(TestCase):
         with self.assertRaises(RuntimeError):
             r = s.run('baz --debug')
 
-        # maybe add this sometime in the future
+        # TODO -- maybe add this sometime in the future
         #r = s.run('Bar.*handshake --debug')
         #pout.v(r)
         #self.assertTrue('bad_accept_handshake' not in r)
