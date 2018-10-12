@@ -40,3 +40,7 @@ elif is_py3:
         finally:
             value = None
             tb = None
+
+
+    def import_source(path):
+        pass

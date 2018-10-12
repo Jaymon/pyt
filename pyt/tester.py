@@ -312,21 +312,44 @@ class PathFinder(object):
 
         return ret
 
-    def _find_prefix_path(self, basedir, prefix):
+    def _find_prefix_paths(self, basedir, prefix):
         ret = basedir
         modnames = re.split(r"[\.\/]", prefix)
-        for modname in modnames:
-            for root, dirs, files in self.walk(ret):
-                ret = ""
-                basename = self._find_basename(modname, dirs, is_prefix=True)
-                if basename:
-                    ret = os.path.join(root, basename)
+        seen_paths = set()
+
+        for root, dirs, files in self.walk(basedir):
+            echo.debug("Checking {} for prefix {}", root, prefix)
+            ret = root
+            for modname in modnames:
+                #echo.debug("Finding {} in {}", modname, ret)
+                for root2, dirs2, files2 in self.walk(ret):
+                    echo.debug("Checking {} for modname {}", root2, modname)
+                    ret = ""
+                    basename = self._find_basename(modname, dirs2, is_prefix=True)
+                    if basename:
+                        ret = os.path.join(root2, basename)
+                        echo.debug("Found prefix path {}", ret)
+                        break
+
+                if not ret:
+                    echo.debug("Could not find a prefix path in {} matching {}", root, modname)
                     break
 
-            if not ret:
-                raise IOError("Could not find a prefix path with {}".format(modname))
+            if ret:
+                if ret not in seen_paths:
+                    seen_paths.add(ret)
+                    echo.debug("Yielding prefix path {}", ret)
+                    yield ret
 
-        echo.debug("Found prefix path {}", ret)
+    def _find_prefix_path(self, basedir, prefix):
+        """Similar to _find_prefix_paths() but only returns the first match"""
+        ret = ""
+        for ret in self._find_prefix_paths(basedir, prefix):
+            break
+
+        if not ret:
+            raise IOError("Could not find prefix {} in path {}".format(prefix, basedir))
+
         return ret
 
     def _find_module_path(self, basedir, modname):
@@ -420,86 +443,6 @@ class PathFinder(object):
         '''
         module_name = getattr(self, 'module_name', '')
         module_prefix = getattr(self, 'prefix', '')
-        basedir = self.basedir
-        filepath = getattr(self, 'filepath', '')
-
-        try:
-            if filepath:
-                if os.path.isabs(filepath):
-                    yield filepath
-
-                else:
-                    yield os.path.join(basedir, filepath)
-
-            else:
-                if module_prefix:
-                    basedir = self._find_prefix_path(basedir, module_prefix)
-
-                if module_name:
-                    path = self._find_module_path(basedir, module_name)
-
-                else:
-                    path = basedir
-
-                if os.path.isfile(path):
-                    echo.debug('Module path: {}', path)
-                    yield path
-
-                else:
-                    seen_paths = set()
-                    for root, dirs, files in self.walk(path):
-                        for basename in files:
-                            if basename.startswith("__init__"):
-                                if self._is_module_path(root):
-                                    filepath = os.path.join(root, basename)
-                                    if filepath not in seen_paths:
-                                        echo.debug('Module package path: {}', filepath)
-                                        seen_paths.add(filepath)
-                                        yield filepath
-
-                            else:
-                                fileroot = os.path.splitext(basename)[0]
-                                for pf in self.module_postfixes:
-                                    if fileroot.endswith(pf):
-                                        filepath = os.path.join(root, basename)
-                                        if filepath not in seen_paths:
-                                            echo.debug('Module postfix path: {}', filepath)
-                                            seen_paths.add(filepath)
-                                            yield filepath
-
-                                for pf in self.module_prefixes:
-                                    if fileroot.startswith(pf):
-                                        filepath = os.path.join(root, basename)
-                                        if filepath not in seen_paths:
-                                            echo.debug('Module prefix path: {}', filepath)
-                                            seen_paths.add(filepath)
-                                            yield filepath
-
-        except IOError as e:
-            # we failed to find a suitable path
-            echo.debug(e)
-            pass
-
-#             import pkgutil
-#             it = pkgutil.walk_packages(path=[path], prefix="")
-#             for importer, modname, ispkg in it:
-#                 pout.v(importer, modname, ispkg)
-
-
-
-
-
-
-    def paths2(self):
-        '''
-        given a basedir, yield all test modules paths recursively found in
-        basedir that are test modules
-
-        return -- generator
-        '''
-        module_name = getattr(self, 'module_name', '')
-        module_prefix = getattr(self, 'prefix', '')
-        basedir = self.basedir
         filepath = getattr(self, 'filepath', '')
 
         if filepath:
@@ -507,67 +450,60 @@ class PathFinder(object):
                 yield filepath
 
             else:
-                yield os.path.join(basedir, filepath)
+                yield os.path.join(self.basedir, filepath)
 
         else:
-            module_regex = ''
-            package_regex = ''
-            if module_name:
-                if module_name.startswith('test') or module_name.endswith('test'):
-                    module_regex = re.compile(
-                        r'^{}\.py$'.format(module_name),
-                        re.I
-                    )
-                    package_regex = re.compile(
-                        r'^{}|{}$'.format(module_name, module_name),
-                        re.I
-                    )
-
-                else:
-                    module_regex = re.compile(
-                        r'^(?:test_?{}|{}.*?_?test)\.py$'.format(module_name, module_name),
-                        re.I
-                    )
-                    package_regex = re.compile(
-                        r'^(?:test_?{}|{}.*?_?test)$'.format(module_name, module_name),
-                        re.I
-                    )
-
-            else:
-                module_regex = re.compile(r'^(?:test\S+|\S+test)\.py$', re.I)
-                package_regex = re.compile(r'^(?:test\S+|\S+test)$', re.I)
-
-            prefix_regex = ''
             if module_prefix:
-                #prefix_regex = re.compile(module_prefix.replace('.', '[\\/]'), re.I)
-                prefix_regex = re.compile(module_prefix, re.I)
+                basedirs = self._find_prefix_paths(self.basedir, module_prefix)
+            else:
+                basedirs = [self.basedir]
 
-            seen_paths = set()
-            for root, dirs, files in os.walk(basedir, topdown=True):
-                pout.v(root)
-                dirs[:] = [d for d in dirs if d[0] != '.'] # ignore dot directories
-                if prefix_regex:
-                    if not prefix_regex.search(root): continue
+            for basedir in basedirs:
+                try:
+                    if module_name:
+                        path = self._find_module_path(basedir, module_name)
 
-                for f in files:
-                    if module_regex.search(f):
-                        filepath = os.path.join(root, f)
-                        if filepath not in seen_paths:
-                            echo.debug('Module path: {}', filepath)
-                            seen_paths.add(filepath)
-                            yield filepath
+                    else:
+                        path = basedir
 
-                    elif f.startswith("__init__") and package_regex.search(os.path.basename(root)):
-                        pmodule_regex = re.compile(r'.py$', re.I)
-                        for proot, pdirs, pfiles in os.walk(root, topdown=True):
-                            pdirs[:] = [d for d in dirs if d[0] != '.']
-                            for pf in pfiles:
-                                if pmodule_regex.search(pf):
-                                    filepath = os.path.join(proot, pf)
-                                    if filepath not in seen_paths:
-                                        echo.debug('Submodule path: {}', filepath)
-                                        seen_paths.add(filepath)
-                                        yield filepath
+                    if os.path.isfile(path):
+                        echo.debug('Module path: {}', path)
+                        yield path
+
+                    else:
+                        seen_paths = set()
+                        for root, dirs, files in self.walk(path):
+                            for basename in files:
+                                if basename.startswith("__init__"):
+                                    if self._is_module_path(root):
+                                        filepath = os.path.join(root, basename)
+                                        if filepath not in seen_paths:
+                                            echo.debug('Module package path: {}', filepath)
+                                            seen_paths.add(filepath)
+                                            yield filepath
+
+                                else:
+                                    fileroot = os.path.splitext(basename)[0]
+                                    for pf in self.module_postfixes:
+                                        if fileroot.endswith(pf):
+                                            filepath = os.path.join(root, basename)
+                                            if filepath not in seen_paths:
+                                                echo.debug('Module postfix path: {}', filepath)
+                                                seen_paths.add(filepath)
+                                                yield filepath
+
+                                    for pf in self.module_prefixes:
+                                        if fileroot.startswith(pf):
+                                            filepath = os.path.join(root, basename)
+                                            if filepath not in seen_paths:
+                                                echo.debug('Module prefix path: {}', filepath)
+                                                seen_paths.add(filepath)
+                                                yield filepath
+
+                except IOError as e:
+                    # we failed to find a suitable path
+                    echo.debug(e)
+                    pass
 
     def module_path(self, filepath):
         """given a filepath like /base/path/to/module.py this will convert it to
@@ -653,6 +589,7 @@ class TestLoader(unittest.TestLoader):
         ts = self.suiteClass()
         ti = PathGuesser(name, self.basedir, self.testMethodPrefix)
         found = False
+        echo.debug("Searching for tests in directory: {}", self.basedir)
         for i, tc in enumerate(ti.possible, 1):
             echo.debug("{}. Searching for tests matching:", i)
             echo.debug("    {}", tc)

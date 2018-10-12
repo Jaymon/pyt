@@ -96,7 +96,7 @@ class TestModule(object):
 
         if len(body) == 1: body = body[0]
         self.body = body
-        if isinstance(body, dict):
+        if isinstance(self.body, dict):
             self.path = testdata.create_modules(
                 self.body,
                 self.cwd,
@@ -112,6 +112,86 @@ class TestModule(object):
 
 
 class PathFinderTest(TestCase):
+    def test__find_prefix_paths(self):
+        modpath = testdata.create_module("find.prefix.paths.whew_test")
+        pf = tester.PathFinder(basedir=modpath.basedir)
+        r = list(pf._find_prefix_paths(pf.basedir, "find.paths"))
+        self.assertEqual(1, len(r))
+
+        basedir = testdata.create_dir()
+        other_basedir = testdata.create_dir("other/directory", basedir)
+        other_modpath = testdata.create_module("tests.fpp_test", [], other_basedir)
+        modpath = testdata.create_module("tests.fpp_test", [], basedir)
+
+        pf = tester.PathFinder(basedir=basedir)
+        r = list(pf._find_prefix_paths(basedir, "tests"))
+        self.assertEqual(2, len(r))
+
+    def test_issue_27(self):
+        # trying to setup the environment according to: https://github.com/Jaymon/pyt/issues/24
+        #raise self.skipTest("still working on this")
+        basedir = testdata.create_dir()
+        other_basedir = testdata.create_dir("other/directory", basedir)
+
+        other_modpath = testdata.create_module(
+            "tests.model27_test",
+            [
+                "from unittest import TestCase",
+                "",
+                "class Issue27TestCase(TestCase):",
+                "   def test_boo(self):",
+                "       pass",
+            ],
+            other_basedir
+        )
+
+        modpath = testdata.create_module(
+            "tests.model27_test",
+            [
+                "from unittest import TestCase",
+                "",
+                "class Issue27TestCase(TestCase):",
+                "   def test_boo(self):",
+                "       pass",
+            ],
+            basedir
+        )
+
+        pout.v(basedir, other_modpath.path, modpath.path)
+
+        pf = tester.PathFinder(
+            basedir=basedir,
+            module_name="model27",
+            prefix="tests",
+            class_name="Issue27",
+            method_name="boo"
+        )
+
+        r = list(pf.method_names())
+        self.assertEqual(2, len(r))
+        self.assertNotEqual(r[0], r[1])
+        pout.v(r)
+        return
+
+        r = list(pf.classes())
+        pout.v(r)
+        return
+
+        r = list(pf.modules())
+        pout.v(r)
+        return
+
+
+        r = list(pf.paths())
+        pout.v(r)
+        return
+
+        r = list(pf._find_prefix_paths(basedir, "tests"))
+        pout.v(r)
+        return
+
+        r = list(pf.method_names())
+
 #     def test_prefix_searching(self):
 #         path = testdata.create_modules({
 #             "foo2_test": [
@@ -158,7 +238,6 @@ class PathFinderTest(TestCase):
 
         pf = tester.PathFinder(
             basedir=path,
-            method_prefix="test",
             module_name="che",
             prefix="foo/bar",
             filepath="",
@@ -167,7 +246,6 @@ class PathFinderTest(TestCase):
 
         pf = tester.PathFinder(
             basedir=path,
-            method_prefix="test",
             module_name="foo",
             prefix="",
             filepath="",
@@ -178,7 +256,6 @@ class PathFinderTest(TestCase):
             basedir=path,
             method_name="boo",
             class_name="Issue26",
-            method_prefix="test",
             module_name="bar",
             prefix="foo_test",
             filepath="",
@@ -188,7 +265,6 @@ class PathFinderTest(TestCase):
 
         pf = tester.PathFinder(
             basedir=path,
-            method_prefix="test",
             module_name="bar",
             prefix="foo",
             filepath="",
@@ -507,6 +583,10 @@ class RunTestTest(TestCase):
         })
         c = m.client
 
+        # running modules
+        r = c.run('{} --debug'.format(m.name))
+        self.assertTrue("skipped=3" in r)
+
         # running one class
         r = c.run('bar.Bar --debug')
         self.assertTrue("bar_test.BarTest.test_one" in r)
@@ -516,10 +596,6 @@ class RunTestTest(TestCase):
         # running one test
         r = c.run('bar.Bar.one --debug', code=1)
         self.assertTrue("skipped=1" in r)
-
-        # running modules
-        r = c.run('{} --debug'.format(m.name))
-        self.assertTrue("skipped=3" in r)
 
         # running one module
         r = c.run('bar --debug')
@@ -1050,7 +1126,7 @@ class TestLoaderTest(TestCase):
         self.assertTrue('test_foo' in str(s))
 
     def test_names(self):
-        return
+        raise self.skipTest("No idea!")
         m = TestModule(
             "from unittest import TestCase",
             "",
@@ -1067,7 +1143,7 @@ class TestLoaderTest(TestCase):
         ret_code = tester.run_test('pmod', m.cwd)
 
     def test_module(self):
-        return
+        raise self.skipTest("No idea!")
         m = TestModule(
             "from unittest import TestCase",
             "",
@@ -1084,7 +1160,7 @@ class TestLoaderTest(TestCase):
 
 
     def test_getting_test(self):
-        return
+        raise self.skipTest("No idea!")
         m = TestModule(
             "from unittest import TestCase",
             "",
@@ -1104,8 +1180,8 @@ class TestLoaderTest(TestCase):
 
 
     def test_find_test_module(self):
+        raise self.skipTest("No idea!")
         # TODO -- update to use testdata
-        return
         tests = (
             (u'five', u'2.3.five_test'),
             (u'five_test', u'2.3.five_test'),
@@ -1117,8 +1193,8 @@ class TestLoaderTest(TestCase):
             self.assertEqual(test.module_name, test_out)
 
     def test_get_test(self):
+        raise self.skipTest("No idea!")
         # TODO -- update to use testdata
-        return
         #pyt.debug = True
 
         basedir = "/foo"
