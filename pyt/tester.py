@@ -13,6 +13,7 @@ import time
 from collections import Counter
 import logging
 import hashlib
+import warnings
 
 from .compat import *
 
@@ -34,10 +35,12 @@ class TestEnviron(object):
     def __init__(self, args=None):
         self.buffer = False
         self.debug = False
+        self.warnings = False
         self.args = args
         if args:
             self.debug = args.debug
             self.buffer = args.buffer
+            self.warnings = args.warnings
 
         self.init_buf()
         self.counter = Counter()
@@ -701,29 +704,32 @@ class TestResult(unittest.TextTestResult):
         self._stderr_buffer = TestEnviron.stderr_buffer
 
 
-# https://hg.python.org/cpython/file/648dcafa7e5f/Lib/unittest/runner.py
 class TestRunner(unittest.TextTestRunner):
     """
     This sets our custom result class and also makes sure the stream that gets passed
     to the runner is the correct stderr stream and not a buffered stream, so it can
     still print out the test information even though it buffers everything else, just
     like how it is done with the original unittest
+
+    https://docs.python.org/3/library/unittest.html#unittest.TextTestRunner
+    https://hg.python.org/cpython/file/648dcafa7e5f/Lib/unittest/runner.py
     """
     resultclass = TestResult
 
     def __init__(self, *args, **kwargs):
         self.environ = TestEnviron.get_instance()
+        if self.environ.warnings:
+            if is_py2:
+                warnings.filterwarnings("error")
+            else:
+                # Changed in version 3.2: Added the warnings argument
+                kwargs["warnings"] = "error"
         stream = self.environ.stderr_stream
         super(TestRunner, self).__init__(
             stream=stream,
             *args,
             **kwargs
         )
-
-#     def __init__(self, stream=None, *args, **kwargs):
-#         if not stream:
-#             stream = self.resultclass.stderr_stream
-#         super(TestRunner, self).__init__(stream=stream, *args, **kwargs)
 
     def _makeResult(self):
         instance = super(TestRunner, self)._makeResult()

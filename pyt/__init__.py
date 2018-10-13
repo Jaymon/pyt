@@ -1,6 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
-from unittest import TestCase, SkipTest # to allow from pyt import TestCase
+from unittest import TestCase # to allow from pyt import TestCase
+from unittest import ( # so pyt can be a one-stop shop for skipping
+    SkipTest,
+    skip,
+    skipIf,
+    skipIf as skip_if,
+    skipUnless,
+    skipUnless as skip_unless
+)
 import os
 
 

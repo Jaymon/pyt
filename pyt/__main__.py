@@ -50,6 +50,12 @@ def console():
         action='store_true',
         help='Stop running tests on first encountered failure'
     )
+    parser.add_argument(
+        '--warnings', "--warning", "-w", "-W",
+        dest='warnings',
+        action='store_true',
+        help='Converts warnings into errors'
+    )
 
     args, test_args = parser.parse_known_args()
 

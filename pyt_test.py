@@ -524,6 +524,30 @@ class RunTestTest(TestCase):
         r = c.run('SkipT.bar --debug')
         self.assertTrue("Ran 1 test" in r)
 
+    def test_warnings(self):
+        """https://github.com/Jaymon/pyt/issues/25"""
+        # !!! this worked:
+        #import warnings
+        #warnings.warn("blah blah blah")
+        # python3 -W error -m unittest pyt_test.RunTestTest.test_warning
+
+        m = TestModule(
+            "from unittest import TestCase",
+            "import pyt",
+            "import warnings",
+            "",
+            "class WarningsTest(TestCase):",
+            "    def test_warning(self):",
+            "        warnings.warn('this warning should be an error')",
+        )
+        c = m.client
+        r = c.run(m.name)
+        self.assertTrue("this warning should be an error" in r)
+
+        r = c.run("{} --warnings".format(m.name), code=1)
+        self.assertTrue("errors=1" in r)
+
+
     def test_environ_2(self):
         m = TestModule({
             "foo_test": [
