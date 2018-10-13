@@ -127,18 +127,18 @@ class PathFinderTest(TestCase):
         r = list(pf._find_prefix_paths(basedir, "tests"))
         self.assertEqual(2, len(r))
 
-    def test_issue_27(self):
+    def test_issue_24(self):
         # trying to setup the environment according to: https://github.com/Jaymon/pyt/issues/24
         #raise self.skipTest("still working on this")
         basedir = testdata.create_dir()
         other_basedir = testdata.create_dir("other/directory", basedir)
 
         other_modpath = testdata.create_module(
-            "tests.model27_test",
+            "i24tests.model24_test",
             [
                 "from unittest import TestCase",
                 "",
-                "class Issue27TestCase(TestCase):",
+                "class Issue24TestCase(TestCase):",
                 "   def test_boo(self):",
                 "       pass",
             ],
@@ -146,71 +146,30 @@ class PathFinderTest(TestCase):
         )
 
         modpath = testdata.create_module(
-            "tests.model27_test",
+            "i24tests.model24_test",
             [
                 "from unittest import TestCase",
                 "",
-                "class Issue27TestCase(TestCase):",
+                "class Issue24TestCase(TestCase):",
                 "   def test_boo(self):",
                 "       pass",
             ],
             basedir
         )
 
-        pout.v(basedir, other_modpath.path, modpath.path)
+        #pout.v(basedir, other_modpath.path, modpath.path)
 
         pf = tester.PathFinder(
             basedir=basedir,
-            module_name="model27",
-            prefix="tests",
-            class_name="Issue27",
+            module_name="model24",
+            prefix="i24tests",
+            class_name="Issue24",
             method_name="boo"
         )
 
         r = list(pf.method_names())
         self.assertEqual(2, len(r))
         self.assertNotEqual(r[0], r[1])
-        pout.v(r)
-        return
-
-        r = list(pf.classes())
-        pout.v(r)
-        return
-
-        r = list(pf.modules())
-        pout.v(r)
-        return
-
-
-        r = list(pf.paths())
-        pout.v(r)
-        return
-
-        r = list(pf._find_prefix_paths(basedir, "tests"))
-        pout.v(r)
-        return
-
-        r = list(pf.method_names())
-
-#     def test_prefix_searching(self):
-#         path = testdata.create_modules({
-#             "foo2_test": [
-#                 "from unittest import TestCase",
-#                 "",
-#                 "class PrefixSearchingCase(TestCase):",
-#                 "   def test_search(self):",
-#                 "       pass",
-#             ]
-#         })
-# 
-#         pf = tester.PathFinder(
-#             basedir=path,
-#             method_prefix="test",
-#             module_name="foo",
-#             prefix="",
-#             filepath="",
-#         )
-#         pout.v(list(pf.paths()))
 
     def test__find_basename(self):
         pf = tester.PathFinder(basedir="/does/not/matter")
@@ -594,8 +553,10 @@ class RunTestTest(TestCase):
         self.assertTrue("Ran 2 tests" in r)
 
         # running one test
-        r = c.run('bar.Bar.one --debug', code=1)
-        self.assertTrue("skipped=1" in r)
+        #r = c.run('bar.Bar.one --debug', code=1)
+        #self.assertTrue("skipped=1" in r)
+        r = c.run('bar.Bar.one --debug')
+        self.assertTrue("Ran 1 test" in r)
 
         # running one module
         r = c.run('bar --debug')
@@ -1062,22 +1023,25 @@ class TestLoaderTest(TestCase):
         self.assertTrue('BarTest' in str(s))
         self.assertTrue('CheTest' in str(s))
 
+        # on 10-13-2018 I changed this from tests to p1tests because I think
+        # there was a name conflict when running all tests which caused this to
+        # fail
         basedir = testdata.create_modules({
-            "tests": "",
-            "tests.bar_test": [
+            "p1tests": "",
+            "p1tests.bar_test": [
                 "from unittest import TestCase",
                 "class BarTest(TestCase):",
                 "   def test_baz(self): pass",
             ],
-            "tests.che_test": [
+            "p1tests.che_test": [
                 "from unittest import TestCase",
                 "class CheTest(TestCase):",
-                "   def test_baz(self): pass",
+                "   def test_baz2(self): pass",
             ]
         })
 
         tl = tester.TestLoader(basedir, tester.TestEnviron())
-        s = tl.loadTestsFromName("tests")
+        s = tl.loadTestsFromName("p1tests")
         self.assertTrue('BarTest' in str(s))
         self.assertTrue('CheTest' in str(s))
 

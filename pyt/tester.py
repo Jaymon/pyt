@@ -11,9 +11,14 @@ import importlib
 #from StringIO import StringIO
 import time
 from collections import Counter
+import logging
+import hashlib
 
-from . import echo
 from .compat import *
+
+
+logging.basicConfig(format="%(message)s", level=logging.WARNING, stream=sys.stderr)
+logger = logging.getLogger(__name__)
 
 
 class TestEnviron(object):
@@ -36,7 +41,10 @@ class TestEnviron(object):
 
         self.init_buf()
         self.counter = Counter()
-        echo.configure(self)
+
+        if self.debug:
+            logger.setLevel(logging.DEBUG)
+            # stddbg = environ.stderr_stream
 
     @classmethod
     def get_instance(cls, args=None):
@@ -102,7 +110,7 @@ class PathGuesser(object):
             bits = name.split(":", 1)
             filepath = bits[0]
             name = bits[1] if len(bits) > 1 else ""
-            echo.debug('Found filepath: {}', filepath)
+            logger.debug('Found filepath: {}'.format(filepath))
 
         bits = name.split('.')
         basedir = self.basedir
@@ -110,7 +118,7 @@ class PathGuesser(object):
 
         # check if the last bit is a Class
         if re.search(r'^[A-Z]', bits[-1]):
-            echo.debug('Found class in name: {}', bits[-1])
+            logger.debug('Found class in name: {}'.format(bits[-1]))
             possible.append(PathFinder(basedir, method_prefix, **{
                 'class_name': bits[-1],
                 'module_name': bits[-2] if len(bits) > 1 else '',
@@ -118,7 +126,7 @@ class PathGuesser(object):
                 'filepath': filepath,
             }))
         elif len(bits) > 1 and re.search(r'^[A-Z]', bits[-2]):
-            echo.debug('Found class in name: {}', bits[-2])
+            logger.debug('Found class in name: {}'.format(bits[-2]))
             possible.append(PathFinder(basedir, method_prefix, **{
                 'class_name': bits[-2],
                 'method_name': bits[-1],
@@ -128,7 +136,7 @@ class PathGuesser(object):
             }))
         else:
             if self.name:
-                echo.debug('Name is ambiguous')
+                logger.debug('Name is ambiguous')
                 possible.append(PathFinder(basedir, method_prefix, **{
                     'module_name': bits[-1],
                     'prefix': os.sep.join(bits[0:-1]),
@@ -197,16 +205,32 @@ class PathFinder(object):
     def modules(self):
         """return modules that match module_name"""
         # this is a hack because I couldn't get imp.load_source to work right
-        sys.path.insert(0, self.basedir)
+        #sys.path.insert(0, self.basedir)
         for p in self.paths():
             # http://stackoverflow.com/questions/67631/
             try:
+#                 module_name = self.module_path(p)
+#                 m = import_path(p)
+#                 m.__name__ = module_name
+#                 pout.v(m.__name__)
+
+
                 module_name = self.module_path(p)
                 m = importlib.import_module(module_name)
+
+                # I don't really like this solution, it seems like a hacky way
+                # to solve: https://github.com/Jaymon/pyt/issues/24
+                if is_py2:
+                    module_hash = hashlib.md5(str(p)).hexdigest()
+                else:
+                    module_hash = hashlib.md5(str(p).encode("utf-8")).hexdigest()
+                sys.modules[module_hash] = sys.modules.pop(module_name)
+
                 yield m
 
             except Exception as e:
-                echo.debug('Caught exception while importing {}: {}', p, e)
+                logger.warning('Caught exception while importing {}: {}'.format(p, e))
+                logger.warning(e, exc_info=True)
                 error_info = getattr(self, 'error_info', None)
                 if not error_info:
                     exc_info = sys.exc_info()
@@ -215,7 +239,7 @@ class PathFinder(object):
                     self.error_info = exc_info
                 continue
 
-        sys.path.pop(0)
+        #sys.path.pop(0)
 
     def classes(self):
         """the partial self.class_name will be used to find actual TestCase classes"""
@@ -234,7 +258,7 @@ class PathFinder(object):
 
                 if can_yield and issubclass(c, unittest.TestCase):
                     if c is not unittest.TestCase: # ignore actual TestCase class
-                        echo.debug('class: {}', c_name)
+                        logger.debug('class: {}'.format(c_name))
                         yield c
 
     def method_names(self):
@@ -263,7 +287,7 @@ class PathFinder(object):
                     can_yield = False
 
                 if can_yield:
-                    echo.debug('method: {}', m_name)
+                    logger.debug('method: {}'.format(m_name))
                     yield c, m_name
 
     def _find_basename(self, name, basenames, is_prefix=False):
@@ -273,12 +297,12 @@ class PathFinder(object):
         for fileroot, basename in fileroots:
             if name in fileroot or fileroot in name:
                 for pf in self.module_postfixes:
-                    echo.debug(
-                        'Checking if basename {} starts with {} and ends with {}',
+                    logger.debug(
+                        'Checking if basename {} starts with {} and ends with {}'.format(
                         basename,
                         name,
                         pf
-                    )
+                    ))
                     if fileroot.startswith(name) and fileroot.endswith(pf):
                         ret = basename
                         break
@@ -286,28 +310,28 @@ class PathFinder(object):
                 if not ret:
                     for pf in self.module_prefixes:
                         n = pf + name
-                        echo.debug('Checking if basename {} starts with {}', basename, n)
+                        logger.debug('Checking if basename {} starts with {}'.format(basename, n))
                         if fileroot.startswith(n):
                             ret = basename
                             break
 
                 if not ret:
                     if is_prefix:
-                        echo.debug('Checking if basename {} starts with {}', basename, name)
+                        logger.debug('Checking if basename {} starts with {}'.format(basename, name))
                         if basename.startswith(name):
                             ret = basename
 
                         else:
-                            echo.debug(
-                                'Checking if basename {} starts with {} and is a test module',
+                            logger.debug(
+                                'Checking if basename {} starts with {} and is a test module'.format(
                                 basename,
                                 name
-                            )
+                            ))
                             if basename.startswith(name) and self._is_module_path(basename):
                                 ret = basename
 
                 if ret:
-                    echo.debug('Found basename {}', ret)
+                    logger.debug('Found basename {}'.format(ret))
                     break
 
         return ret
@@ -318,27 +342,26 @@ class PathFinder(object):
         seen_paths = set()
 
         for root, dirs, files in self.walk(basedir):
-            echo.debug("Checking {} for prefix {}", root, prefix)
+            logger.debug("Checking {} for prefix {}".format(root, prefix))
             ret = root
             for modname in modnames:
-                #echo.debug("Finding {} in {}", modname, ret)
                 for root2, dirs2, files2 in self.walk(ret):
-                    echo.debug("Checking {} for modname {}", root2, modname)
+                    logger.debug("Checking {} for modname {}".format(root2, modname))
                     ret = ""
                     basename = self._find_basename(modname, dirs2, is_prefix=True)
                     if basename:
                         ret = os.path.join(root2, basename)
-                        echo.debug("Found prefix path {}", ret)
+                        logger.debug("Found prefix path {}".format(ret))
                         break
 
                 if not ret:
-                    echo.debug("Could not find a prefix path in {} matching {}", root, modname)
+                    logger.debug("Could not find a prefix path in {} matching {}".format(root, modname))
                     break
 
             if ret:
                 if ret not in seen_paths:
                     seen_paths.add(ret)
-                    echo.debug("Yielding prefix path {}", ret)
+                    logger.debug("Yielding prefix path {}".format(ret))
                     yield ret
 
     def _find_prefix_path(self, basedir, prefix):
@@ -359,7 +382,7 @@ class PathFinder(object):
             ret = self._find_prefix_path(basedir, modname)
 
         except IOError:
-            echo.debug('Checking for a module that matches {} in {}', modname, basedir)
+            logger.debug('Checking for a module that matches {} in {}'.format(modname, basedir))
             for root, dirs, files in self.walk(basedir):
                 basename = self._find_basename(modname, files, is_prefix=False)
                 if basename:
@@ -373,7 +396,7 @@ class PathFinder(object):
                     if fileroot in modname or modname in fileroot:
                         for pf in self.module_postfixes:
                             n = modname + pf
-                            echo.debug('Checking {} against {}', n, fileroot)
+                            logger.debug('Checking {} against {}'.format(n, fileroot))
                             if fileroot.startswith(n):
                                 ret = os.path.join(root, basename)
                                 break
@@ -381,7 +404,7 @@ class PathFinder(object):
                         if not ret:
                             for pf in self.module_prefixes:
                                 n = pf + modname
-                                echo.debug('Checking {} against {}', n, fileroot)
+                                logger.debug('Checking {} against {}'.format(n, fileroot))
                                 if fileroot.startswith(n):
                                     ret = os.path.join(root, basename)
                                     break
@@ -397,7 +420,7 @@ class PathFinder(object):
         if not ret:
             raise IOError("Could not find a module path with {}".format(modname))
 
-        echo.debug("Found module path {}", ret)
+        logger.debug("Found module path {}".format(ret))
         return ret
 
     def _is_module_path(self, path):
@@ -467,7 +490,7 @@ class PathFinder(object):
                         path = basedir
 
                     if os.path.isfile(path):
-                        echo.debug('Module path: {}', path)
+                        logger.debug('Module path: {}'.format(path))
                         yield path
 
                     else:
@@ -478,7 +501,7 @@ class PathFinder(object):
                                     if self._is_module_path(root):
                                         filepath = os.path.join(root, basename)
                                         if filepath not in seen_paths:
-                                            echo.debug('Module package path: {}', filepath)
+                                            logger.debug('Module package path: {}'.format(filepath))
                                             seen_paths.add(filepath)
                                             yield filepath
 
@@ -488,7 +511,7 @@ class PathFinder(object):
                                         if fileroot.endswith(pf):
                                             filepath = os.path.join(root, basename)
                                             if filepath not in seen_paths:
-                                                echo.debug('Module postfix path: {}', filepath)
+                                                logger.debug('Module postfix path: {}'.format(filepath))
                                                 seen_paths.add(filepath)
                                                 yield filepath
 
@@ -496,13 +519,13 @@ class PathFinder(object):
                                         if fileroot.startswith(pf):
                                             filepath = os.path.join(root, basename)
                                             if filepath not in seen_paths:
-                                                echo.debug('Module prefix path: {}', filepath)
+                                                logger.debug('Module prefix path: {}'.format(filepath))
                                                 seen_paths.add(filepath)
                                                 yield filepath
 
                 except IOError as e:
                     # we failed to find a suitable path
-                    echo.debug(e)
+                    logger.warning(e, exc_info=True)
                     pass
 
     def module_path(self, filepath):
@@ -524,10 +547,10 @@ class PathFinder(object):
                 if os.path.isfile(module_init): break
 
             if x > 1:
-                echo.debug(
-                    'Removed {} from {} because is is not a python module',
+                logger.debug(
+                    'Removed {} from {} because is is not a python module'.format(
                     os.sep.join(modules[0:x]), module_name
-                )
+                ))
 
             module_name = '.'.join(modules[x:])
 
@@ -589,32 +612,27 @@ class TestLoader(unittest.TestLoader):
         ts = self.suiteClass()
         ti = PathGuesser(name, self.basedir, self.testMethodPrefix)
         found = False
-        echo.debug("Searching for tests in directory: {}", self.basedir)
+        logger.debug("Searching for tests in directory: {}".format(self.basedir))
         for i, tc in enumerate(ti.possible, 1):
-            echo.debug("{}. Searching for tests matching:", i)
-            echo.debug("    {}", tc)
+            logger.debug("{}. Searching for tests matching:".format(i))
+            logger.debug("    {}".format(tc))
             if tc.has_method():
                 for c, mn in tc.method_names():
-                    #echo.debug('adding test method to suite: {}', mn)
-                    #echo.out('Found method test: {}.{}.{}', c.__module__, c.__name__, mn)
-                    echo.debug('Found method test: {}.{}', strclass(c), mn)
+                    logger.debug('Found method test: {}.{}'.format(strclass(c), mn))
                     found = True
                     ts.addTest(c(mn))
                     self.environ.counter["methods"] += 1
 
             elif tc.has_class():
                 for c in tc.classes():
-                    #echo.debug('adding testcase to suite: {}', c.__name__)
-                    #echo.out('Found class test: {}.{}', c.__module__, c.__name__)
-                    echo.debug('Found class test: {}', strclass(c))
+                    logger.debug('Found class test: {}'.format(strclass(c)))
                     found = True
                     ts.addTest(self.loadTestsFromTestCase(c))
                     self.environ.counter["classes"] += 1
 
             else:
                 for m in tc.modules():
-                    #echo.debug('adding module to suite: {}', m.__name__)
-                    echo.debug('Found module test: {}', m.__name__)
+                    logger.debug('Found module test: {}'.format(m.__name__))
                     found = True
                     ts.addTest(self.loadTestsFromModule(m))
                     self.environ.counter["modules"] += 1
@@ -625,7 +643,7 @@ class TestLoader(unittest.TestLoader):
         if not found:
             ti.raise_any_error()
 
-        echo.debug("Found {} total tests".format(ts.countTestCases()))
+        logger.debug("Found {} total tests".format(ts.countTestCases()))
         return ts
 
     def loadTestsFromNames(self, names, *args, **kwargs):
@@ -652,7 +670,7 @@ class TestResult(unittest.TextTestResult):
         """ran once before each TestCase"""
         self._pyt_start = time.time()
 
-        echo.debug("{}/{} - Starting {}.{}".format(
+        logger.debug("{}/{} - Starting {}.{}".format(
             self.testsRun + 1,
             self.total_tests,
             strclass(test.__class__),
@@ -669,7 +687,7 @@ class TestResult(unittest.TextTestResult):
 
         pyt_stop = time.time()
 
-        echo.debug("Stopping {}.{} after {}s".format(
+        logger.debug("Stopping {}.{} after {}s".format(
             strclass(test.__class__),
             test._testMethodName,
             round(pyt_stop - pyt_start, 2)
@@ -748,7 +766,7 @@ def run_test(name, basedir, **kwargs):
         elif not ret.result.testsRun:
             ret_code = 1
 
-        echo.debug('Test returned: {}', ret_code)
+        logger.debug('Test returned: {}'.format(ret_code))
 
     finally:
         environ.unbuffer()
