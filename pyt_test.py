@@ -507,6 +507,23 @@ class RunTestTest(TestCase):
 
         r = s.run('pmod --debug')
 
+    def test_skip_tests(self):
+        """https://github.com/Jaymon/pyt/issues/27"""
+        m = TestModule(
+            "from unittest import TestCase",
+            "import pyt",
+            "",
+            "class SkipTTest(TestCase):",
+            "    @classmethod",
+            "    def setUpClass(cls):",
+            "        pyt.skip_multi_class()",
+            "",
+            "    def test_bar(self): pass",
+        )
+        c = m.client
+        r = c.run('SkipT.bar --debug')
+        self.assertTrue("Ran 1 test" in r)
+
     def test_environ_2(self):
         m = TestModule({
             "foo_test": [

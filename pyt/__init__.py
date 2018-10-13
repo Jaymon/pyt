@@ -28,9 +28,14 @@ def get_counts():
 
 
 def is_single_class():
-    """Returns True if only a class is being run"""
+    """Returns True if only a single class is being run or some tests within a single class"""
+    ret = False
     counts = get_counts()
-    return counts["classes"] == 1 and counts["modules"] <= 1
+    if counts["classes"] < 1 and counts["modules"] < 1:
+        ret = counts["tests"] > 0
+    else:
+        ret = counts["classes"] <= 1 and counts["modules"] <= 1
+    return ret
 
 
 def skip_multi_class(msg=""):
