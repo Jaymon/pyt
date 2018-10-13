@@ -32,6 +32,19 @@ class TestEnviron(object):
     _instance = None
     """singleton"""
 
+    @property
+    def debug(self):
+        return self._debug
+
+    @debug.setter
+    def debug(self, v):
+        if v:
+            logger.setLevel(logging.DEBUG)
+            # stddbg = environ.stderr_stream
+        else:
+            logger.setLevel(logging.WARNING)
+        self._debug = v
+
     def __init__(self, args=None):
         self.buffer = False
         self.debug = False
@@ -45,9 +58,8 @@ class TestEnviron(object):
         self.init_buf()
         self.counter = Counter()
 
-        if self.debug:
-            logger.setLevel(logging.DEBUG)
-            # stddbg = environ.stderr_stream
+#         if self.debug:
+#             logger.setLevel(logging.DEBUG)
 
     @classmethod
     def get_instance(cls, args=None):
@@ -294,8 +306,24 @@ class PathFinder(object):
                     yield c, m_name
 
     def _find_basename(self, name, basenames, is_prefix=False):
+        """check if name combined with test prefixes or postfixes is found anywhere
+        in the list of basenames
+
+        :param name: string, the name you're searching for
+        :param basenames: list, a list of basenames to check
+        :param is_prefix: bool, True if this is a prefix search, which means it will
+            also check if name matches any of the basenames without the prefixes or
+            postfixes, if it is False then the prefixes or postfixes must be present
+            (ie, the module we're looking for is the actual test module, not the parent
+             modules it's contained in)
+        :returns: string, the basename if it is found
+        """
         ret = ""
         fileroots = [(os.path.splitext(n)[0], n) for n in basenames]
+        glob = False
+        if name.startswith("*"):
+            glob = True
+        name = name.strip("*")
 
         for fileroot, basename in fileroots:
             if name in fileroot or fileroot in name:
@@ -306,22 +334,32 @@ class PathFinder(object):
                         name,
                         pf
                     ))
-                    if fileroot.startswith(name) and fileroot.endswith(pf):
-                        ret = basename
-                        break
+                    if glob:
+                        if name in fileroot and fileroot.endswith(pf):
+                            ret = basename
+                            break
+                    else:
+                        if fileroot.startswith(name) and fileroot.endswith(pf):
+                            ret = basename
+                            break
 
                 if not ret:
                     for pf in self.module_prefixes:
                         n = pf + name
                         logger.debug('Checking if basename {} starts with {}'.format(basename, n))
-                        if fileroot.startswith(n):
-                            ret = basename
-                            break
+                        if glob:
+                            if fileroot.startswith(pf) and name in fileroot:
+                                ret = basename
+                                break
+                        else:
+                            if fileroot.startswith(n):
+                                ret = basename
+                                break
 
                 if not ret:
                     if is_prefix:
                         logger.debug('Checking if basename {} starts with {}'.format(basename, name))
-                        if basename.startswith(name):
+                        if basename.startswith(name) or (glob and name in basename):
                             ret = basename
 
                         else:
@@ -330,8 +368,13 @@ class PathFinder(object):
                                 basename,
                                 name
                             ))
-                            if basename.startswith(name) and self._is_module_path(basename):
-                                ret = basename
+                            if glob:
+                                if name in basename and self._is_module_path(basename):
+                                    ret = basename
+
+                            else:
+                                if basename.startswith(name) and self._is_module_path(basename):
+                                    ret = basename
 
                 if ret:
                     logger.debug('Found basename {}'.format(ret))

@@ -20,12 +20,14 @@ for k in list(sys.modules.keys()):
 
 import pyt
 from pyt import tester
-from pyt import echo
+#from pyt import echo
 from pyt.compat import *
 
 
-echo.DEBUG = True
-testdata.basic_logging()
+#echo.DEBUG = True
+#testdata.basic_logging()
+environ = tester.TestEnviron.get_instance()
+environ.debug = True
 
 
 class Client(ModuleCommand):
@@ -49,6 +51,10 @@ class Client(ModuleCommand):
 
 
 class TestModule(object):
+    @property
+    def basedir(self):
+        return self.cwd
+
     @property
     def client(self):
         return Client(self.cwd)
@@ -126,6 +132,37 @@ class PathFinderTest(TestCase):
         pf = tester.PathFinder(basedir=basedir)
         r = list(pf._find_prefix_paths(basedir, "tests"))
         self.assertEqual(2, len(r))
+
+    def test_glob(self):
+        modpath = testdata.create_module(
+            "globbartests.globfoo_test",
+            [
+                "from unittest import TestCase",
+                "",
+                "class GlobFooTest(TestCase):",
+                "    def test_bar(self):",
+                "        pass",
+            ],
+        )
+        pf = tester.PathFinder(basedir=modpath.basedir, prefix="*bar", module_name="*foo")
+        r = list(pf.paths())
+        self.assertEqual(1, len(r))
+
+        r = pf._find_basename("*bar", ["globbartests"], is_prefix=True)
+        self.assertEqual("globbartests", r)
+
+        r = pf._find_basename("*bar", ["globbartests"], is_prefix=False)
+        self.assertEqual("globbartests", r)
+
+        r = pf._find_basename("*foo", ["globfoo_test.py", "__init__.py"], is_prefix=False)
+        self.assertEqual("globfoo_test.py", r)
+
+        r = pf._find_basename("*foo", ["globfoo_test.py", "__init__.py"], is_prefix=True)
+        self.assertEqual("globfoo_test.py", r)
+
+        pf = tester.PathFinder(basedir=modpath.basedir, prefix="bar", module_name="foo")
+        r = list(pf.paths())
+        self.assertEqual(0, len(r))
 
     def test_issue_24(self):
         # trying to setup the environment according to: https://github.com/Jaymon/pyt/issues/24
