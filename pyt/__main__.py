@@ -5,7 +5,7 @@ import platform
 import argparse
 import os
 
-from pyt import tester, __version__
+from pyt import tester, __version__, main
 
 
 def console():
@@ -59,6 +59,10 @@ def console():
 
     args, test_args = parser.parse_known_args()
 
+    # ripped from unittest.__main__.py
+    if sys.argv[0].endswith("__main__.py"):
+        sys.argv[0] = "python -m pyt"
+
     # https://docs.python.org/2/library/unittest.html#command-line-options
     test_args.insert(0, sys.argv[0])
     if args.failfast:
@@ -69,25 +73,21 @@ def console():
         args.names = ['']
         args.buffer = True
 
-    # create the singleton
-    environ = tester.TestEnviron.get_instance(args)
+    ret_code = main(
+        args.names,
+        args.basedir,
+        argv=test_args,
+        buffer=args.buffer,
+        warnings=args.warnings,
+#         verbosity
+#         args=args
+    )
 
-    if not args.names:
-        args.names.append('')
-
-    if args.names:
-        for name in args.names:
-            ret_code |= tester.run_test(
-                name,
-                args.basedir,
-                argv=test_args,
-            )
-
-    else:
-        environ.unbuffer()
-        # http://unix.stackexchange.com/a/8815/118750
-        parser.print_help()
-        ret_code = 1
+#     else:
+#         environ.unbuffer()
+#         # http://unix.stackexchange.com/a/8815/118750
+#         parser.print_help()
+#         ret_code = 1
 
     sys.exit(ret_code)
 

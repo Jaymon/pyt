@@ -22,6 +22,7 @@ import pyt
 from pyt import tester
 #from pyt import echo
 from pyt.compat import *
+from pyt.utils import testpath, classpath
 
 
 #echo.DEBUG = True
@@ -115,6 +116,16 @@ class TestModule(object):
                 self.body,
                 self.cwd
             )
+
+    def run(self, name="", **kwargs):
+        if not name:
+            name = self.name
+        r = tester.main(
+            self.name,
+            self.cwd,
+            **kwargs
+        )
+        return r
 
 
 class PathFinderTest(TestCase):
@@ -387,6 +398,37 @@ class PathGuesserTest(TestCase):
 
 
 class RunTestTest(TestCase):
+    def test_multi_cli(self):
+        m = TestModule({
+            "multicli_test": [
+                "from unittest import TestCase",
+                "",
+                "class OneTest(TestCase):",
+                "    def test_one(self):",
+                "        pass",
+                "",
+            ],
+            "climulti_test": [
+                "from unittest import TestCase",
+                "",
+                "class TwoTest(TestCase):",
+                "    def test_two(self):",
+                "        pass",
+                "",
+            ],
+        })
+
+        c = m.client
+        r = c.run("multicli.One.one climulti.Two.two")
+        pout.v(r)
+        return
+
+        r = s.run("--all") # should buffer
+        r2 = s.run("") # should print "in bar test"
+        r3 = s.run("--buffer") # should be just like --all
+        self.assertNotEqual(r, r2)
+        self.assertEqual(r, r3)
+
     def test_double_counting_and_pyc(self):
         """Make sure packages don't get double counted"""
         # https://github.com/Jaymon/pyt/issues/18
@@ -768,7 +810,7 @@ class RunTestTest(TestCase):
         )
 
         with self.assertRaises(SyntaxError):
-            ret_code = tester.run_test('PEFoo.bar', cwd)
+            ret_code = tester.main('PEFoo.bar', cwd)
 
     def test_relative_import(self):
         cwd = testdata.create_dir()
@@ -785,7 +827,7 @@ class RunTestTest(TestCase):
             tmpdir=cwd
         )
 
-        ret_code = tester.run_test('Foo.bar', cwd)
+        ret_code = tester.main('Foo.bar', cwd)
 
     def test_multi(self):
         # if there is an error in one of the tests but another test is found, don't
@@ -812,7 +854,7 @@ class RunTestTest(TestCase):
             tmpdir=cwd
         )
 
-        ret_code = tester.run_test('multi.', cwd)
+        ret_code = tester.main('multi.', cwd)
         self.assertEqual(0, ret_code)
 
     def test_no_tests_found(self):
@@ -831,7 +873,7 @@ class RunTestTest(TestCase):
             tmpdir=cwd
         )
 
-        ret_code = tester.run_test('nofound_does_not_exist.', cwd)
+        ret_code = tester.main('nofound_does_not_exist.', cwd)
         self.assertEqual(1, ret_code)
 
     def test_cli_errors(self):
@@ -856,7 +898,7 @@ class RunTestTest(TestCase):
             tmpdir=cwd
         )
 
-        ret_code = tester.run_test('cli_2.', cwd)
+        ret_code = tester.main('cli_2.', cwd)
         self.assertEqual(0, ret_code)
 
         # if there is an error and no other test is found, bubble up the error
@@ -867,7 +909,7 @@ class RunTestTest(TestCase):
         )
 
         with self.assertRaises(ValueError):
-            ret_code = tester.run_test(m.name_prefix, m.cwd)
+            ret_code = tester.main(m.name_prefix, m.cwd)
 
     def test_cli(self):
         m = TestModule(
@@ -974,10 +1016,10 @@ class RunTestTest(TestCase):
         )
 
         s = Client(m.cwd)
-        ret_code = tester.run_test('foobar.', m.cwd)
+        ret_code = tester.main('foobar.', m.cwd)
         self.assertEqual(0, ret_code)
 
-        ret_code = tester.run_test('ps2.', m.cwd)
+        ret_code = tester.main('ps2.', m.cwd)
         self.assertEqual(0, ret_code)
 
     def test_setup(self):
@@ -996,7 +1038,7 @@ class RunTestTest(TestCase):
             "    pass"
         )
 
-        ret_code = tester.run_test('pmod', m.cwd)
+        ret_code = tester.main('pmod', m.cwd)
         self.assertEqual(0, ret_code)
 
     def test_names_1(self):
@@ -1011,10 +1053,10 @@ class RunTestTest(TestCase):
             "   pass"
         )
 
-        ret_code = tester.run_test('pmod', m.cwd)
+        ret_code = tester.main('pmod', m.cwd)
         self.assertEqual(0, ret_code)
 
-        ret_code = tester.run_test('', m.cwd)
+        ret_code = tester.main('', m.cwd)
         self.assertEqual(0, ret_code)
 
     def test_names_2(self):
@@ -1182,7 +1224,7 @@ class TestLoaderTest(TestCase):
 
         # this should call load from name(s)
         #tl = tester.TestLoader('pmod', m.cwd)
-        ret_code = tester.run_test('pmod', m.cwd)
+        ret_code = tester.main('pmod', m.cwd)
 
     def test_module(self):
         raise self.skipTest("No idea!")
@@ -1261,6 +1303,26 @@ class TestLoaderTest(TestCase):
 
 
 class TestResultTest(TestCase):
+    def test_rerun(self):
+        raise self.skipTest()
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "class RerunTestCase(TestCase):",
+            "    def test_success(self):",
+            "        pass",
+            "",
+            "    def test_error(self):",
+            "        raise ValueError()",
+            "",
+            "    def test_failure(self):",
+            "        self.assertTrue(False)",
+            "",
+        )
+
+        r = m.run()
+        pout.v(r)
+
     def test_buffering(self):
         m = TestModule(
             "from __future__ import print_function",
@@ -1286,25 +1348,34 @@ class TestResultTest(TestCase):
         )
 
         search_str = '{}.BaseTResultTestCase.failure'.format(m.name)
-        t = tester.run_test(
+        t = tester.main(
             search_str,
             m.cwd,
             buffer=True,
         )
 
         search_str = '{}.BaseTResultTestCase.success'.format(m.name)
-        t = tester.run_test(
+        t = tester.main(
             search_str,
             m.cwd,
             buffer=True,
         )
 
         search_str = '{}.BaseTResultTestCase.success'.format(m.name)
-        t = tester.run_test(
+        t = tester.main(
             search_str,
             m.cwd
         )
 
+
+class UtilsTest(TestCase):
+    def test_classpath(self):
+        s = "pyt_test.UtilsTest"
+        r = classpath(self)
+        self.assertEqual(s, r)
+
+        r = classpath(UtilsTest)
+        self.assertEqual(s, r)
 
 # import threading
 # class ThreadingTest(TestCase):

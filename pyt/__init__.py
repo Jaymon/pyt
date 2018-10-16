@@ -10,6 +10,7 @@ from unittest import ( # so pyt can be a one-stop shop for skipping
     skipUnless as skip_unless
 )
 import os
+from .tester import main # so you can do pyt.main like unittest.main
 
 
 __version__ = '0.7.31'
