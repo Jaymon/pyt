@@ -8,7 +8,7 @@ import os
 from pyt import tester, __version__, main
 
 
-def console():
+def console2():
     '''
     cli hook
 
@@ -59,10 +59,6 @@ def console():
 
     args, test_args = parser.parse_known_args()
 
-    # ripped from unittest.__main__.py
-    if sys.argv[0].endswith("__main__.py"):
-        sys.argv[0] = "python -m pyt"
-
     # https://docs.python.org/2/library/unittest.html#command-line-options
     test_args.insert(0, sys.argv[0])
     if args.failfast:
@@ -90,6 +86,21 @@ def console():
 #         ret_code = 1
 
     sys.exit(ret_code)
+
+
+def console():
+    # ripped from unittest.__main__.py
+#     if sys.argv[0].endswith("__main__.py"):
+#         sys.argv[0] = "python -m pyt"
+    if sys.argv[0].endswith("__main__.py"):
+        executable = os.path.basename(sys.executable)
+        sys.argv[0] = executable + " -m pyt"
+
+    # py <3
+    #from unittest.main import USAGE_AS_MAIN
+    #main.USAGE = USAGE_AS_MAIN
+
+    main(module=None)
 
 
 if __name__ == "__main__":

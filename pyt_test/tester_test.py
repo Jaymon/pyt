@@ -1,400 +1,84 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-import unittest
-from unittest import TestCase
-import os
 import sys
-import subprocess
 
 import testdata
-from testdata.client import ModuleCommand
 
-# remove any global pyt
-# NOTE -- when I actually got rid of the modules (just the .pop() without the
-# reassignment to bak.) it caused all kinds of strange and subtle issues, but
-# only when I was running the tests with a global pyt
-for k in list(sys.modules.keys()):
-    if k.startswith("pyt.") or k == "pyt":
-        sys.modules["bak.{}".format(k)] = sys.modules.pop(k)
+from pyt.tester import TestProgram
+from pyt import __version__
+from . import TestCase, TestModule
 
 
-import pyt
-from pyt import tester
-#from pyt import echo
-from pyt.compat import *
-from pyt.utils import testpath, classpath
+class TestProgramTest(TestCase):
+    def test_version(self):
+        m = TestModule([
+            "class VersionTest(TestCase):",
+            "    def test_one(self):",
+            "        pass",
+        ])
 
+        r = m.client.run("--version")
+        self.assertTrue(sys.executable in r)
+        self.assertTrue(__version__ in r)
 
-#echo.DEBUG = True
-#testdata.basic_logging()
-environ = tester.TestEnviron.get_instance()
-environ.debug = True
-
-
-class Client(ModuleCommand):
-    @property
-    def environ(self):
-        environ = super(Client, self).environ
-        if os.getcwd() not in environ["PYTHONPATH"]:
-            environ["PYTHONPATH"] = os.getcwd() + os.pathsep + environ["PYTHONPATH"]
-        return environ
-
-    def __init__(self, cwd):
-        super(Client, self).__init__("pyt", cwd=cwd)
-
-    def create_cmd(self, arg_str):
-        prefix_arg_str = '--basedir="{}"'.format(self.cwd)
-        if arg_str:
-            arg_str = prefix_arg_str + " " + arg_str
-        else:
-            arg_str = prefix_arg_str
-        return super(Client, self).create_cmd(arg_str)
-
-
-class TestModule(object):
-    @property
-    def basedir(self):
-        return self.cwd
-
-    @property
-    def client(self):
-        return Client(self.cwd)
-
-    @property
-    def test(self):
-        t = tester.Test()
-        t.module_name = self.name
-        return t
-
-    @property
-    def tl(self):
-        tl = tester.TestLoader(self.cwd, tester.TestEnviron())
-        return tl
-    loader = tl
-
-    @property
-    def tci(self):
-        """return a PathFinder instance for this module"""
-        tc = tester.PathFinder(
-            self.cwd,
-            module_name=self.module_name, 
-            prefix=self.prefix
-        )
-        return tc
-    pathfinder = tci
-
-    def __init__(self, *body, **kwargs):
-        self.cwd = testdata.create_dir()
-
-        name = kwargs.get('name', '')
-        if name:
-            self.name = name
-
-        else:
-            self.name = "prefix{}.pmod{}_test".format(
-                testdata.get_ascii(5),
-                testdata.get_ascii(5)
-            )
-
-        bits = self.name.rsplit('.', 1)
-        self.module_name = bits[1] if len(bits) == 2 else bits[0]
-        self.prefix = bits[0] if len(bits) == 2 else ''
-        self.name_prefix = bits[1][:4] if len(bits) == 2 else bits[0][:4]
-
-        if len(body) == 1: body = body[0]
-        self.body = body
-        if isinstance(self.body, dict):
-            self.path = testdata.create_modules(
-                self.body,
-                self.cwd,
-                prefix=self.name,
-            )
-
-        else:
-            self.path = testdata.create_module(
-                self.name,
-                self.body,
-                self.cwd
-            )
-
-    def run(self, name="", **kwargs):
-        if not name:
-            name = self.name
-        r = tester.main(
-            self.name,
-            self.cwd,
-            **kwargs
-        )
-        return r
-
-
-class PathFinderTest(TestCase):
-    def test__find_prefix_paths(self):
-        modpath = testdata.create_module("find.prefix.paths.whew_test")
-        pf = tester.PathFinder(basedir=modpath.basedir)
-        r = list(pf._find_prefix_paths(pf.basedir, "find.paths"))
-        self.assertEqual(1, len(r))
-
-        basedir = testdata.create_dir()
-        other_basedir = testdata.create_dir("other/directory", basedir)
-        other_modpath = testdata.create_module("tests.fpp_test", [], other_basedir)
-        modpath = testdata.create_module("tests.fpp_test", [], basedir)
-
-        pf = tester.PathFinder(basedir=basedir)
-        r = list(pf._find_prefix_paths(basedir, "tests"))
-        self.assertEqual(2, len(r))
-
-    def test_glob(self):
-        modpath = testdata.create_module(
-            "globbartests.globfoo_test",
-            [
-                "from unittest import TestCase",
-                "",
-                "class GlobFooTest(TestCase):",
-                "    def test_bar(self):",
-                "        pass",
-            ],
-        )
-        pf = tester.PathFinder(basedir=modpath.basedir, prefix="*bar", module_name="*foo")
-        r = list(pf.paths())
-        self.assertEqual(1, len(r))
-
-        r = pf._find_basename("*bar", ["globbartests"], is_prefix=True)
-        self.assertEqual("globbartests", r)
-
-        r = pf._find_basename("*bar", ["globbartests"], is_prefix=False)
-        self.assertEqual("globbartests", r)
-
-        r = pf._find_basename("*foo", ["globfoo_test.py", "__init__.py"], is_prefix=False)
-        self.assertEqual("globfoo_test.py", r)
-
-        r = pf._find_basename("*foo", ["globfoo_test.py", "__init__.py"], is_prefix=True)
-        self.assertEqual("globfoo_test.py", r)
-
-        pf = tester.PathFinder(basedir=modpath.basedir, prefix="bar", module_name="foo")
-        r = list(pf.paths())
-        self.assertEqual(0, len(r))
-
-    def test_issue_24(self):
-        # trying to setup the environment according to: https://github.com/Jaymon/pyt/issues/24
-        #raise self.skipTest("still working on this")
-        basedir = testdata.create_dir()
-        other_basedir = testdata.create_dir("other/directory", basedir)
-
-        other_modpath = testdata.create_module(
-            "i24tests.model24_test",
-            [
-                "from unittest import TestCase",
-                "",
-                "class Issue24TestCase(TestCase):",
-                "   def test_boo(self):",
-                "       pass",
-            ],
-            other_basedir
+    def test_single_run(self):
+        m = TestModule(
+            "class SingleRunTest(TestCase):",
+            "    def test_bar(self): pass",
         )
 
-        modpath = testdata.create_module(
-            "i24tests.model24_test",
-            [
-                "from unittest import TestCase",
-                "",
-                "class Issue24TestCase(TestCase):",
-                "   def test_boo(self):",
-                "       pass",
-            ],
-            basedir
+        r = m.client.run(m.name)
+        self.assertTrue("Ran 1 test" in r)
+
+    def test_multi_run(self):
+        m = TestModule(
+            "class MultiRunTest(TestCase):",
+            "    def test_foo(self): pass",
+            "    def test_bar(self): pass",
         )
 
-        #pout.v(basedir, other_modpath.path, modpath.path)
+        r = m.client.run("MultiRun.foo MultiRun.bar")
+        self.assertTrue("Ran 2 tests" in r)
 
-        pf = tester.PathFinder(
-            basedir=basedir,
-            module_name="model24",
-            prefix="i24tests",
-            class_name="Issue24",
-            method_name="boo"
+    def test_buffer(self):
+        buffered_s = testdata.get_ascii_words()
+        m = TestModule(
+            "class BufferTest(TestCase):",
+            "    def test_bar(self):",
+            "        print('{}')".format(buffered_s),
         )
 
-        r = list(pf.method_names())
-        self.assertEqual(2, len(r))
-        self.assertNotEqual(r[0], r[1])
+        r = m.client.run("--verbose Buffer.bar")
+        self.assertTrue(buffered_s in r)
+        self.assertTrue("Guessing name:" in r)
 
-    def test__find_basename(self):
-        pf = tester.PathFinder(basedir="/does/not/matter")
-        r = pf._find_basename("foo", ["foo2_test"])
-        self.assertEqual("foo2_test", r)
+        r = m.client.run("Buffer.bar")
+        self.assertFalse("Guessing name:" in r)
+        self.assertTrue(buffered_s in r)
 
-        r = pf._find_basename("foo2", ["foo2_test"])
-        self.assertEqual("foo2_test", r)
+        pout.b()
+        r = m.client.run("--buffer Buffer.bar")
+        self.assertFalse("Guessing name:" in r)
+        self.assertFalse(buffered_s in r)
 
-        r = pf._find_basename("fo", ["foo2_test.py", "bar_test.py"])
-        self.assertEqual("foo2_test.py", r)
-
-    def test_issue_26(self):
-        path = testdata.create_modules({
-            "foo_test": [],
-            "foo_test.bar": [],
-            "foo_test.bar.che_test": [
-                "from unittest import TestCase",
-                "",
-                "class Issue26TestCase(TestCase):",
-                "   def test_boo(self):",
-                "       pass",
-            ]
-        })
-
-        pf = tester.PathFinder(
-            basedir=path,
-            module_name="che",
-            prefix="foo/bar",
-            filepath="",
-        )
-        self.assertEqual(1, len(list(pf.paths())))
-
-        pf = tester.PathFinder(
-            basedir=path,
-            module_name="foo",
-            prefix="",
-            filepath="",
-        )
-        self.assertEqual(2, len(list(pf.paths())))
-
-        pf = tester.PathFinder(
-            basedir=path,
-            method_name="boo",
-            class_name="Issue26",
-            module_name="bar",
-            prefix="foo_test",
-            filepath="",
-        )
-        ti = tester.PathGuesser("foo_test.bar.Issue26.boo", path)
-        self.assertEqual("test_boo", list(pf.method_names())[0][1])
-
-        pf = tester.PathFinder(
-            basedir=path,
-            module_name="bar",
-            prefix="foo",
-            filepath="",
-        )
-        self.assertEqual(1, len(list(pf.paths())))
+        r = m.client.run("--buffer --verbose Buffer.bar")
+        self.assertTrue("Guessing name:" in r)
+        self.assertFalse(buffered_s in r)
 
 
-
-        #pout.v(list(pf.paths()))
-        #pout.v(pf)
-#         return
+#     def test_verbose_propagate(self):
+#         m = TestModule(
+#             "class VerboseTest(TestCase):",
+#             "    def test_bar(self): pass",
+#         )
 # 
-#         ti = tester.PathGuesser("foo.bar", path)
-#         pout.v(ti.possible)
+#         r = m.client.run("--verbose --buffer {}".format(m.name))
+#         return
 
 
-    def test_method_names(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class CheTest(TestCase):",
-            "   def test_foo(self): pass",
-            name="foo.bar_test"
-        )
-
-        tc = m.tci
-        tc.class_name = 'Che'
-        tc.method_name = 'foo'
-
-        r = list(tc.method_names())
-        self.assertEqual(1, len(r))
-
-    def test_paths(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class CheTest(TestCase):",
-            "   pass",
-            name="foo.bar.baz_test"
-        )
-
-        tc = m.tci
-
-        cs = list(tc.paths())
-        self.assertEqual(1, len(cs))
-
-        tc.prefix = 'boom.bam'
-        #with self.assertRaises(LookupError):
-        cs = list(tc.paths())
-        self.assertEqual(0, len(cs))
-
-    def test_classes(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class BaseTCase(TestCase):",
-            "   def test_foo(self):",
-            "       pass",
-            "",
-            "class BarTest(BaseTCase):",
-            "   pass"
-        )
-
-        tc = m.tci
-        cs = list(tc.classes())
-        self.assertEqual(2, len(cs))
-
-        tc.class_name = 'Bar'
-        cs = list(tc.classes())
-        self.assertEqual(1, len(cs))
 
 
-class PathGuesserTest(TestCase):
-    def test_filename(self):
-        ti = tester.PathGuesser("foo/bar/che.py", '/tmp')
-        self.assertEqual("/tmp/foo/bar/che.py", list(ti.possible[0].paths())[0])
 
-        ti = tester.PathGuesser("/foo/bar/che.py", '/tmp')
-        self.assertEqual("/foo/bar/che.py", list(ti.possible[0].paths())[0])
-
-    def test_set_possible(self):
-        tests = (
-            ('foo.bar', [
-                {'module_name': 'bar', 'prefix': 'foo'},
-                {'method_name': 'bar', 'module_name': 'foo', 'prefix': ''}
-            ]),
-            ('foo.Bar', [
-                {'module_name': 'foo', 'class_name': 'Bar', 'prefix': ''}
-            ]),
-            ('foo.Bar.baz', [
-                {'module_name': 'foo', 'class_name': 'Bar', 'prefix': '', 'method_name': 'baz'}
-            ]),
-            ('prefix.foo.Bar.baz', [
-                {'module_name': 'foo', 'class_name': 'Bar', 'prefix': 'prefix', 'method_name': 'baz'}
-            ]),
-            ('pre.fix.foo.Bar.baz', [
-                {'module_name': 'foo', 'class_name': 'Bar', 'prefix': 'pre/fix', 'method_name': 'baz'}
-            ]),
-            ('Call.controller', [
-                {'class_name': 'Call', 'method_name': 'controller', 'prefix': '', 'module_name': ''}
-            ]),
-            ('Call', [
-                {'class_name': 'Call', 'prefix': '', 'module_name': ''}
-            ]),
-            ('Boom.fooBar', [
-                {'class_name': 'Boom', 'prefix': '', 'module_name': '', 'method_name': 'fooBar'}
-            ]),
-            ('get_SQL', [
-                {'module_name': 'get_SQL', 'prefix': ''},
-                {'method_name': 'get_SQL', 'module_name': '', 'prefix': ''}
-            ]),
-        )
-
-        for test_in, test_out in tests:
-            ti = tester.PathGuesser(test_in, '/tmp')
-            for i, to in enumerate(test_out):
-                for k, v in to.items():
-                    r = getattr(ti.possible[i], k)
-                    self.assertEqual(v, r)
-
-    def test_no_name(self):
-        ti = tester.PathGuesser('', '/tmp')
-        self.assertEqual(1, len(ti.possible))
 
 
 class RunTestTest(TestCase):
@@ -1367,15 +1051,6 @@ class TestResultTest(TestCase):
             m.cwd
         )
 
-
-class UtilsTest(TestCase):
-    def test_classpath(self):
-        s = "pyt_test.UtilsTest"
-        r = classpath(self)
-        self.assertEqual(s, r)
-
-        r = classpath(UtilsTest)
-        self.assertEqual(s, r)
 
 # import threading
 # class ThreadingTest(TestCase):

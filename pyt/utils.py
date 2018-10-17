@@ -4,14 +4,17 @@ from unittest.util import strclass
 import itertools
 
 
-def testpath(test):
+def testpath(test, method_name=""):
     """Returns the full classpath (eg prefix.module.Class.method) for a passed in
     test
 
     :param test: TestCase, the test case instance
     :returns: string, the full testpath
     """
-    return "{}.{}".format(classpath(test), test._testMethodName)
+    if not method_name:
+        method_name = test._testMethodName
+
+    return "{}.{}".format(classpath(test), method_name)
 
 
 def classpath(v):

@@ -47,6 +47,8 @@ class PathGuesser(object):
         '''
         possible = []
         name = self.name
+        logger.debug('Guessing name: {}'.format(name))
+
         name_f = self.name.lower()
         filepath = ""
         if name_f.endswith(".py") or ".py:" in name_f:
@@ -202,7 +204,7 @@ class PathFinder(object):
 
                 if can_yield and issubclass(c, unittest.TestCase):
                     if c is not unittest.TestCase: # ignore actual TestCase class
-                        logger.debug('class: {}'.format(c_name))
+                        logger.debug('class: {} matches {}'.format(c_name, class_name))
                         yield c
 
     def method_names(self):
@@ -231,7 +233,7 @@ class PathFinder(object):
                     can_yield = False
 
                 if can_yield:
-                    logger.debug('method: {}'.format(m_name))
+                    logger.debug('method: {} matches {}'.format(m_name, method_name))
                     yield c, m_name
 
     def _find_basename(self, name, basenames, is_prefix=False):
