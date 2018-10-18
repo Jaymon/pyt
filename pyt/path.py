@@ -196,7 +196,7 @@ class PathFinder(object):
     def modules(self):
         """return modules that match module_name"""
         # this is a hack because I couldn't get imp.load_source to work right
-        #sys.path.insert(0, self.basedir)
+        sys.path.insert(0, self.basedir)
         for p in self.paths():
             # http://stackoverflow.com/questions/67631/
             try:
@@ -216,7 +216,7 @@ class PathFinder(object):
                     self.error_info = exc_info
                 continue
 
-        #sys.path.pop(0)
+        sys.path.pop(0)
 
     def classes(self):
         """the partial self.class_name will be used to find actual TestCase classes"""
