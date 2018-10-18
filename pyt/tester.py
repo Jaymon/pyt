@@ -224,6 +224,8 @@ class TestRunner(BaseTestRunner):
 
 class TestProgram(BaseTestProgram):
     """
+    https://docs.python.org/3/library/unittest.html#unittest.main
+    https://docs.python.org/2.7/library/unittest.html#unittest.main
     https://github.com/python/cpython/blob/3.7/Lib/unittest/main.py
     https://github.com/python/cpython/blob/2.7/Lib/unittest/main.py
     """
@@ -380,6 +382,7 @@ class TestProgram(BaseTestProgram):
             )
         )
 
+        # https://docs.python.org/2/library/warnings.html
         parser.add_argument(
             '--warnings', "--warning", "-w", "-W",
             dest='warnings',
