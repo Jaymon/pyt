@@ -64,7 +64,8 @@ class TestModule(object):
 
     @property
     def loader(self):
-        tl = TestLoader(self.cwd, TestEnviron())
+        tl = TestLoader()
+        tl._top_level_dir = self.cwd
         return tl
     tl = loader
 

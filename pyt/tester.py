@@ -16,6 +16,7 @@ import logging
 import argparse
 import sys
 import platform
+import warnings
 
 from .compat import *
 from .utils import testpath, classpath, chain
@@ -58,7 +59,11 @@ class TestLoader(BaseTestLoader):
     def loadTestsFromName(self, name, *args, **kwargs):
         ts = self.suiteClass()
         environ = TestEnviron.get_instance()
-        ti = PathGuesser(name, method_prefix=self.testMethodPrefix)
+        ti = PathGuesser(
+            name,
+            basedir=self._top_level_dir,
+            method_prefix=self.testMethodPrefix
+        )
         found = False
         logger.debug("Searching for tests in directory: {}".format(ti.basedir))
         for i, tc in enumerate(ti.possible, 1):
@@ -186,39 +191,48 @@ class TestRunner(BaseTestRunner):
     """
     resultclass = TestResult
 
-    def __init__(self, *args, **kwargs):
-        self.environ = TestEnviron.get_instance()
-        if self.environ.warnings:
-            if is_py2:
-                warnings.filterwarnings("error")
-            else:
-                # Changed in version 3.2: Added the warnings argument
-                kwargs["warnings"] = "error"
-        #stream = self.environ.stderr_stream
-        super(TestRunner, self).__init__(
-            *args,
-            **kwargs
-        )
+#     def __init__(self, *args, **kwargs):
+# #         self.environ = TestEnviron.get_instance()
+# #         if self.environ.warnings:
+# #             if is_py2:
+# #                 warnings.filterwarnings("error")
+# #             else:
+# #                 # Changed in version 3.2: Added the warnings argument
+# #                 kwargs["warnings"] = "error"
+#         #stream = self.environ.stderr_stream
+#         super(TestRunner, self).__init__(
+#             *args,
+#             **kwargs
+#         )
 
     def _makeResult(self):
         instance = super(TestRunner, self)._makeResult()
         instance.total_tests = self.running_test.countTestCases()
-        self.environ.update_env_for_test(instance.total_tests)
+
+        environ = TestEnviron.get_instance()
+        environ.update_env_for_test(instance.total_tests)
+
         return instance
 
     def run(self, test):
+        if is_py2:
+            w = test.main.warnings
+            if w:
+                warnings.filterwarnings("error")
+
         self.running_test = test
         result = super(TestRunner, self).run(test)
         self.running_test = None
 
         if self.verbosity > 1:
             if len(result.errors) or len(result.failures):
-                self.stream.writeln("Test failures/errors:")
+                count = len(result.errors) + len(result.failures)
+                self.stream.writeln("Failed or errored {} tests".format(count))
                 for testcase, failure in chain(result.errors, result.failures):
                     self.stream.writeln(testpath(testcase))
 
             if len(result.skipped):
-                self.stream.writeln("Tests skipped:")
+                self.stream.writeln("Skipped {} tests:".format(len(result.skipped)))
                 for testcase, failure in result.skipped:
                     self.stream.writeln(testpath(testcase))
 
@@ -260,29 +274,93 @@ class TestProgram(BaseTestProgram):
     def parseArgs(self, argv):
         #pout.v(argv)
         if is_py2:
-            parser = self._getParentArgParser()
-            parser.parse_known_args()
+            if len(argv) > 1 and argv[1].lower() == 'discover':
+                self._do_discovery(argv[2:])
+            else:
+                parser = self._getParentArgParser()
+                parser.parse_args(argv[1:], self)
+                self.createTests()
 
-        ret = super(TestProgram, self).parseArgs(argv)
+        else:
+            ret = super(TestProgram, self).parseArgs(argv)
 
         # after parent's parseArgs is ran self.testNames should be set and
         # should contain all the passed in patterns pyt can use to find the
         # tests, but parseArgs() also calls createTests() which uses that
         # information so by the time we get to right here all tests have been
         # created
-        #pout.v(self.testNames)
+        #pout.v(self.testNames, self)
 
     def createTests(self, *args, **kwargs):
         # if we didn't pass in any test names then we want to find all tests
         if not self.testNames:
             self.testNames = [""]
-        return super(TestProgram, self).createTests(*args, **kwargs)
+        super(TestProgram, self).createTests(*args, **kwargs)
+
+        # we want to keep open the possibility of grabbing values from this
+        # later on down the line
+        self.test.main = self
+
+    def _print_help(self):
+        if is_py2:
+            try:
+                self.usageExit()
+            except SystemExit:
+                pass
+
+        else:
+            super(TestProgram, self)._print_help()
 
     def _getParentArgParser(self):
         from . import __version__ # avoid circular dependency
 
         if is_py2:
+            # so python 2.7 unittest uses optparse, which makes it so you can't
+            # specify flags in any position, so we basically are going to build
+            # a shadow argparser and bypass 2.7's opt parser so we can be a bit
+            # more flexible
             parser = argparse.ArgumentParser()
+            parser.prog = self.progName
+            parser.print_help = self._print_help
+            parser.add_argument(
+                '-v', '--verbose', '--debug', '-d',
+                dest='verbosity',
+                action='store_const',
+                const=2,
+                help='Verbose output'
+            )
+            parser.add_argument(
+                '-q', '--quiet',
+                dest='verbosity',
+                action='store_const',
+                const=0,
+                help='Quiet output'
+            )
+            parser.add_argument(
+                '-f', '--failfast',
+                dest='failfast',
+                action='store_true',
+                help='Stop on first fail or error'
+            )
+            parser.add_argument(
+                '-c', '--catch',
+                dest='catchbreak',
+                action='store_true',
+                help='Catch Ctrl-C and display results so far'
+            )
+            parser.add_argument(
+                '-b', '--buffer',
+                dest='buffer',
+                action='store_true',
+                help='Buffer stdout and stderr during tests'
+            )
+            parser.add_argument(
+                'testNames',
+                metavar='tests',
+                #dest='testNames',
+                nargs='*',
+                help='a list of any number of test modules, classes and test methods.'
+            )
 
         else:
             parser = super(TestProgram, self)._getParentArgParser()
@@ -295,6 +373,15 @@ class TestProgram(BaseTestProgram):
                 platform.python_version(),
                 sys.executable
             )
+        )
+
+        parser.add_argument(
+            '--warnings', "--warning", "-w", "-W",
+            dest='warnings',
+            action='store_const',
+            const="error",
+            default="",
+            help='Converts warnings into errors'
         )
 
         return parser

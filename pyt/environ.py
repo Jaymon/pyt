@@ -18,9 +18,9 @@ class TestEnviron(object):
     """singleton"""
 
     def __init__(self, **kwargs):
-        self.buffer = kwargs.pop("buffer", False)
-        self.debug = kwargs.pop("debug", False)
-        self.warnings = kwargs.pop("warnings", False)
+        #self.buffer = kwargs.pop("buffer", False)
+        #self.debug = kwargs.pop("debug", False)
+        #self.warnings = kwargs.pop("warnings", False)
         self.counter = Counter()
 #         #pout.v(os.getcwd())
 #         self.basedir = self.normalize_dir(os.getcwd())

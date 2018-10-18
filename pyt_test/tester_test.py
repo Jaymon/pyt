@@ -93,19 +93,19 @@ class TestProgramTest(TestCase):
 
         r = m.client.run("--verbose Buffer.bar")
         self.assertTrue(buffered_s in r)
-        self.assertTrue("Guessing name:" in r)
+        self.assertTrue("Guessing test name:" in r)
 
         r = m.client.run("Buffer.bar")
-        self.assertFalse("Guessing name:" in r)
+        self.assertFalse("Guessing test name:" in r)
         self.assertTrue(buffered_s in r)
 
         pout.b()
         r = m.client.run("--buffer Buffer.bar")
-        self.assertFalse("Guessing name:" in r)
+        self.assertFalse("Guessing test name:" in r)
         self.assertFalse(buffered_s in r)
 
         r = m.client.run("--buffer --verbose Buffer.bar")
-        self.assertTrue("Guessing name:" in r)
+        self.assertTrue("Guessing test name:" in r)
         self.assertFalse(buffered_s in r)
 
     def test_buffer_3(self):
@@ -467,29 +467,9 @@ class TestProgramTest(TestCase):
         r = s.run('ps2.')
         self.assertTrue("Ran 1 test" in r)
 
-    def test_setup(self):
+    def test_testcase_parent(self):
         m = TestModule(
-            "def setUpModule():",
-            "    print('setUpModule')",
-            "",
-            "def tearDownModule():",
-            "    print('tearDownModule')",
-            "",
             "class BaseTCase(TestCase):",
-            "    @classmethod",
-            "    def setUpClass(cls):",
-            "         print('setUpClass')",
-            "",
-            "    def setUp(self):",
-            "         print('setUp')",
-            "",
-            "    def tearDown(self):",
-            "         print('tearDown')",
-            "",
-            "    @classmethod",
-            "    def tearDownClass(cls):",
-            "         print('tearDownClass')",
-            "",
             "    def test_foo(self):",
             "        pass",
             "",
@@ -500,47 +480,79 @@ class TestProgramTest(TestCase):
 
         r = s.run("--verbose {}".format(m.name_prefix))
         self.assertTrue("Ran 2 tests" in r)
-        #self.assertTrue("here" in r)
-        return
 
-        pout.b()
-        r = s.run("--verbose {}".format(m.name))
-
-
-
-
-
-class RunTestTest(TestCase):
-
-
-    def test_environ_1(self):
+    def test_setup(self):
         m = TestModule(
-            "import os",
-            "from unittest import TestCase",
+            "def setUpModule():",
+            "    print('*setUpModule*')",
             "",
-            "class BarTest(TestCase):",
-            "    def test_bar(self):",
-            "        if int(os.environ['PYT_TEST_COUNT']) == 1:",
-            "            raise ValueError('test count 1')",
+            "def tearDownModule():",
+            "    print('*tearDownModule*')",
             "",
-            "class FooTest(TestCase):",
+            "class SetupCase(TestCase):",
+            "    @classmethod",
+            "    def setUpClass(cls):",
+            "         print('*setUpClass*')",
+            "",
+            "    def setUp(self):",
+            "         print('*setUp*')",
+            "",
+            "    def tearDown(self):",
+            "         print('*tearDown*')",
+            "",
+            "    @classmethod",
+            "    def tearDownClass(cls):",
+            "         print('*tearDownClass*')",
+            "",
             "    def test_foo(self):",
-            "        if int(os.environ['PYT_TEST_COUNT']) == 2:",
-            "            raise ValueError('test count 2')",
-            "",
-            "    def test_che(self):",
             "        pass",
         )
+        s = m.client
 
-        s = Client(m.cwd)
+        r = s.run(m.name_prefix)
+        calls = [
+            "*setUpModule*",
+            "*tearDownModule*",
+            "*setUpClass*",
+            "*tearDownClass*",
+            "*setUp*",
+            "*tearDown*"
+        ]
+        for call in calls:
+            self.assertTrue(call in r)
 
-        with self.assertRaises(RuntimeError):
-            r = s.run('Bar --debug')
+    def test_names_1(self):
+        m = TestModule(
+            "class BaseTCase(TestCase):",
+            "   def test_foo(self):",
+            "       pass",
+            "",
+            "class BarTest(BaseTCase):",
+            "   pass"
+        )
+        s = m.client
 
-        with self.assertRaises(RuntimeError):
-            r = s.run('Foo --debug')
+        ret_code = s.run(m.name_prefix)
+        self.assertTrue("Ran 2 tests")
 
-        r = s.run('pmod --debug')
+        ret_code = s.run("")
+        self.assertTrue("Ran 2 tests")
+
+    def test_names_2(self):
+        m = TestModule([
+            "class Names2Test(TestCase):",
+            "    def test_1name(self):",
+            "        print('test 1')",
+            "",
+            "    def test_2name(self):",
+            "        print('test 2')",
+        ])
+        s = m.client
+
+        r = s.run("Names2.1name Names2.2name")
+        self.assertTrue("test 1" in r)
+        self.assertTrue("test 2" in r)
+        self.assertTrue("Ran 2 tests")
 
     def test_warnings(self):
         """https://github.com/Jaymon/pyt/issues/25"""
@@ -550,8 +562,6 @@ class RunTestTest(TestCase):
         # python3 -W error -m unittest pyt_test.RunTestTest.test_warning
 
         m = TestModule(
-            "from unittest import TestCase",
-            "import pyt",
             "import warnings",
             "",
             "class WarningsTest(TestCase):",
@@ -566,111 +576,7 @@ class RunTestTest(TestCase):
         self.assertTrue("errors=1" in r)
 
 
-    def test_environ_2(self):
-        m = TestModule({
-            "foo_test": [
-                "from unittest import TestCase",
-                "import pyt",
-                "",
-                "def setUpModule():",
-                "    counts = pyt.get_counts()",
-                "    for k, n in counts.items():",
-                "        print('{}: {}'.format(k, n))",
-                "",
-                "class FooTest(TestCase):",
-                "    def test_one_class(self):",
-                "        pyt.skip_multi_class('one_class')",
-                "    def test_one_module(self):",
-                "        pyt.skip_multi_module('one_module')",
-            ],
-            "bar_test": [
-                "from unittest import TestCase",
-                "import pyt",
-                "",
-                "def setUpModule():",
-                "    pyt.skip_multi_module('bar_module')",
-                "",
-                "class BarTest(TestCase):",
-                "    def test_one(self):",
-                "        pyt.skip_multi_test('one_test')",
-                "    def test_two(self):",
-                "        #print(pyt.get_counts())",
-                "        pass",
-                "",
-            ],
-        })
-        c = m.client
-
-        # running modules
-        r = c.run('{} --debug'.format(m.name))
-        self.assertTrue("skipped=3" in r)
-
-        # running one class
-        r = c.run('bar.Bar --debug')
-        self.assertTrue("bar_test.BarTest.test_one" in r)
-        self.assertTrue("bar_test.BarTest.test_two" in r)
-        self.assertTrue("Ran 2 tests" in r)
-
-        # running one test
-        #r = c.run('bar.Bar.one --debug', code=1)
-        #self.assertTrue("skipped=1" in r)
-        r = c.run('bar.Bar.one --debug')
-        self.assertTrue("Ran 1 test" in r)
-
-        # running one module
-        r = c.run('bar --debug')
-        self.assertTrue("bar_test.BarTest.test_one" in r)
-        self.assertTrue("bar_test.BarTest.test_two" in r)
-        self.assertTrue("Ran 2 tests" in r)
-        self.assertTrue("skipped=1" in r)
-
-    def test_names_1(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class BaseTCase(TestCase):",
-            "   def test_foo(self):",
-            "       pass",
-            "",
-            "class BarTest(BaseTCase):",
-            "   pass"
-        )
-
-        ret_code = tester.main('pmod', m.cwd)
-        self.assertEqual(0, ret_code)
-
-        ret_code = tester.main('', m.cwd)
-        self.assertEqual(0, ret_code)
-
-    def test_names_2(self):
-        m = TestModule([
-            "from __future__ import print_function",
-            "from unittest import TestCase",
-            "",
-            "class Names2Test(TestCase):",
-            "    def test_1name(self):",
-            "        print('test 1')",
-            "",
-            "    def test_2name(self):",
-            "        print('test 2')",
-        ])
-
-        s = m.client
-        r = s.run("Names2.1name Names2.2name")
-        self.assertEqual(2, r.count("Ran 1 test"))
-
-
 class TestLoaderTest(TestCase):
-#     def test_basedir(self):
-#         m = TestModule(
-#             "class BasedirTest(TestCase):",
-#             "   def test_one(self): pass",
-#         )
-# 
-#         tl = m.loader
-#         tl.loadTestsFromName(m.path)
-
-
     def test_private_testcase(self):
         # https://github.com/Jaymon/pyt/issues/17
         m = TestModule(
@@ -683,40 +589,42 @@ class TestLoaderTest(TestCase):
             "   def test_foo(self): pass"
         )
 
-        tl = m.tl
+        tl = m.loader
         s = tl.loadTestsFromName(m.name)
         r = str(s)
+        self.assertTrue(r)
         self.assertFalse("_TestCase.test_common" in r)
 
         s = tl.loadTestsFromName("{}.Che".format(m.name))
         r = str(s)
+        self.assertTrue(r)
         self.assertFalse("_TestCase.test_common" in r)
 
         s = tl.loadTestsFromName("{}.Che.foo".format(m.name))
         r = str(s)
+        self.assertTrue(r)
         self.assertFalse("_TestCase.test_common" in r)
 
     def test_package_1(self):
-        basedir = testdata.create_modules({
+        m = TestModule({
             "packagefoo2_test": "",
             "packagefoo2_test.bar_test": [
-                "from unittest import TestCase",
                 "class BarTest(TestCase):",
                 "   def test_baz(self): pass",
             ],
             "packagefoo2_test.che_test": [
-                "from unittest import TestCase",
                 "class CheTest(TestCase):",
                 "   def test_baz(self): pass",
             ]
         })
+        tl = m.loader
 
-        tl = tester.TestLoader(basedir, tester.TestEnviron())
         s = tl.loadTestsFromName("packagefoo")
+        pout.v(str(s))
         self.assertTrue('BarTest' in str(s))
         self.assertTrue('CheTest' in str(s))
 
-        basedir = testdata.create_modules({
+        m = TestModule({
             "packagefoo_test": "",
             "packagefoo_test.bar": "",
             "packagefoo_test.bar.zoom_test": [
@@ -730,8 +638,8 @@ class TestLoaderTest(TestCase):
                 "   def test_baz(self): pass",
             ]
         })
+        tl = m.loader
 
-        tl = tester.TestLoader(basedir, tester.TestEnviron())
         s = tl.loadTestsFromName("packagefoo")
         self.assertTrue('BarTest' in str(s))
         self.assertTrue('CheTest' in str(s))
@@ -739,7 +647,7 @@ class TestLoaderTest(TestCase):
         # on 10-13-2018 I changed this from tests to p1tests because I think
         # there was a name conflict when running all tests which caused this to
         # fail
-        basedir = testdata.create_modules({
+        m = TestModule({
             "p1tests": "",
             "p1tests.bar_test": [
                 "from unittest import TestCase",
@@ -752,33 +660,30 @@ class TestLoaderTest(TestCase):
                 "   def test_baz2(self): pass",
             ]
         })
+        tl = m.loader
 
-        tl = tester.TestLoader(basedir, tester.TestEnviron())
         s = tl.loadTestsFromName("p1tests")
         self.assertTrue('BarTest' in str(s))
         self.assertTrue('CheTest' in str(s))
 
     def test_package_2(self):
         """https://github.com/Jaymon/pyt/issues/23"""
-        basedir = testdata.create_modules({
+        m = TestModule({
             "p2tests.foo.bar.baz_test": [
-                "from unittest import TestCase",
                 "class BazTest(TestCase):",
                 "   def test_foo(self): pass",
             ],
             "p2tests.foo.bar.boo_test": [
-                "from unittest import TestCase",
                 "class BooTest(TestCase):",
                 "   def test_foo(self): pass",
             ],
             "p2tests.foo.bar.che_test": [
-                "from unittest import TestCase",
                 "class CheTest(TestCase):",
                 "   def test_foo(self): pass",
             ],
         })
+        tl = m.loader
 
-        tl = tester.TestLoader(basedir, tester.TestEnviron())
         s = tl.loadTestsFromName("foo.bar")
         self.assertTrue('BazTest' in str(s))
         self.assertTrue('BooTest' in str(s))
@@ -786,13 +691,11 @@ class TestLoaderTest(TestCase):
 
     def test_suite(self):
         m = TestModule(
-            "from unittest import TestCase",
-            "",
             "class CheTest(TestCase):",
             "   def test_foo(self): pass"
         )
+        tl = m.loader
 
-        tl = m.tl
         s = tl.loadTestsFromName(m.name)
         self.assertTrue('test_foo' in str(s))
 
@@ -802,180 +705,70 @@ class TestLoaderTest(TestCase):
         s = tl.loadTestsFromName('{}.foo'.format(m.name))
         self.assertTrue('test_foo' in str(s))
 
-    def test_names(self):
-        raise self.skipTest("No idea!")
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class BaseTCase(TestCase):",
-            "   def test_foo(self):",
-            "       pass",
-            "",
-            "class BarTest(BaseTCase):",
-            "   pass"
-        )
 
-        # this should call load from name(s)
-        #tl = tester.TestLoader('pmod', m.cwd)
-        ret_code = tester.main('pmod', m.cwd)
-
-    def test_module(self):
-        raise self.skipTest("No idea!")
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class BaseTCase(TestCase):",
-            "   def test_foo(self):",
-            "       pass",
-            "",
-            "class BarTest(BaseTCase):",
-            "   pass"
-        )
-
-        tl = tester.TestLoader('pmod', m.cwd)
-        pout.v(tl.module)
-
-
-    def test_getting_test(self):
-        raise self.skipTest("No idea!")
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class BaseTCase(TestCase):",
-            "   def test_foo(self):",
-            "       pass",
-            "",
-            "class BarTest(BaseTCase):",
-            "   pass"
-        )
-
-        pout.b()
-        search_str = '{}.Bar.foo'.format(m.name)
-        t = tester.get_test(m.cwd, m.path, 'Bar', 'foo')
-        pout.v(t)
-        pout.b()
-
-
-    def test_find_test_module(self):
-        raise self.skipTest("No idea!")
-        # TODO -- update to use testdata
-        tests = (
-            (u'five', u'2.3.five_test'),
-            (u'five_test', u'2.3.five_test'),
-            (u'one', u'test.1.one_test'),
-        )
-
-        for test_in, test_out in tests:
-            test = pyt.find_test({'module': test_in}, '/foo')
-            self.assertEqual(test.module_name, test_out)
-
-    def test_get_test(self):
-        raise self.skipTest("No idea!")
-        # TODO -- update to use testdata
-        #pyt.debug = True
-
-        basedir = "/foo"
-        filepath = "/foo/boom/bang/bam_test.py"
-        test = pyt.get_test(basedir, filepath)
-        self.assertEqual('bam_test', str(test))
-
-        basedir = "/foo"
-        filepath = "/foo/2/3/five_test.py"
-        test = pyt.get_test(basedir, filepath)
-        self.assertEqual('2.3.five_test', str(test))
-
-        basedir = "/foo"
-        filepath = "/bar/che/six_test.py"
-        test = pyt.get_test(basedir, filepath)
-        self.assertEqual('che.six_test', str(test))
-
-        basedir = "/foo"
-        filepath = "/one/two/three/seven_test.py"
-        test = pyt.get_test(basedir, filepath)
-        self.assertEqual('three.seven_test', str(test))
-
-
-class TestResultTest(TestCase):
-    def test_rerun(self):
-        raise self.skipTest()
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class RerunTestCase(TestCase):",
-            "    def test_success(self):",
-            "        pass",
-            "",
-            "    def test_error(self):",
-            "        raise ValueError()",
-            "",
-            "    def test_failure(self):",
-            "        self.assertTrue(False)",
-            "",
-        )
-
-        r = m.run()
-        pout.v(r)
-
-    def test_buffering(self):
-        m = TestModule(
-            "from __future__ import print_function",
-            "from unittest import TestCase",
-            "import logging",
-            "import sys",
-            "",
-            "logging.basicConfig()",
-            "logger = logging.getLogger(__name__)",
-            "logger.setLevel(logging.DEBUG)",
-            "log_handler = logging.StreamHandler(stream=sys.stderr)",
-            "logger.addHandler(log_handler)",
-            "",
-            "class BaseTResultTestCase(TestCase):",
-            "   def test_success(self):",
-            "       logger.info('foo')",
-            "",
-            "   def test_failure(self):",
-            "       logger.info('foo')",
-            "       print('bar')",
-            "       self.assertTrue(False)",
-            "",
-        )
-
-        search_str = '{}.BaseTResultTestCase.failure'.format(m.name)
-        t = tester.main(
-            search_str,
-            m.cwd,
-            buffer=True,
-        )
-
-        search_str = '{}.BaseTResultTestCase.success'.format(m.name)
-        t = tester.main(
-            search_str,
-            m.cwd,
-            buffer=True,
-        )
-
-        search_str = '{}.BaseTResultTestCase.success'.format(m.name)
-        t = tester.main(
-            search_str,
-            m.cwd
-        )
-
-
-# import threading
-# class ThreadingTest(TestCase):
+# class TestResultTest(TestCase):
+#     def test_rerun(self):
+#         raise self.skipTest()
+#         m = TestModule(
+#             "from unittest import TestCase",
+#             "",
+#             "class RerunTestCase(TestCase):",
+#             "    def test_success(self):",
+#             "        pass",
+#             "",
+#             "    def test_error(self):",
+#             "        raise ValueError()",
+#             "",
+#             "    def test_failure(self):",
+#             "        self.assertTrue(False)",
+#             "",
+#         )
 # 
-#     def test_threading_import(self):
-#         """Turns out there is a race condition when importing common.models.chat,
-#         this test is the minimum viable fail case so Jay can track it down"""
-#         saved_chat = sys.modules.pop("testdata", None)
+#         r = m.run()
+#         pout.v(r)
 # 
-#         def target():
-#             import testdata
+#     def test_buffering(self):
+#         m = TestModule(
+#             "from __future__ import print_function",
+#             "from unittest import TestCase",
+#             "import logging",
+#             "import sys",
+#             "",
+#             "logging.basicConfig()",
+#             "logger = logging.getLogger(__name__)",
+#             "logger.setLevel(logging.DEBUG)",
+#             "log_handler = logging.StreamHandler(stream=sys.stderr)",
+#             "logger.addHandler(log_handler)",
+#             "",
+#             "class BaseTResultTestCase(TestCase):",
+#             "   def test_success(self):",
+#             "       logger.info('foo')",
+#             "",
+#             "   def test_failure(self):",
+#             "       logger.info('foo')",
+#             "       print('bar')",
+#             "       self.assertTrue(False)",
+#             "",
+#         )
 # 
-#         #t1 = TestThread(target=target)
-#         t1 = threading.Thread(target=target)
-#         t1.start()
-#         t1.join()
+#         search_str = '{}.BaseTResultTestCase.failure'.format(m.name)
+#         t = tester.main(
+#             search_str,
+#             m.cwd,
+#             buffer=True,
+#         )
 # 
-
+#         search_str = '{}.BaseTResultTestCase.success'.format(m.name)
+#         t = tester.main(
+#             search_str,
+#             m.cwd,
+#             buffer=True,
+#         )
+# 
+#         search_str = '{}.BaseTResultTestCase.success'.format(m.name)
+#         t = tester.main(
+#             search_str,
+#             m.cwd
+#         )
+# 
 
