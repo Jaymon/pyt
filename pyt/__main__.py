@@ -12,8 +12,6 @@ from pyt.compat import *
 
 def console():
     # ripped from unittest.__main__.py
-#     if sys.argv[0].endswith("__main__.py"):
-#         sys.argv[0] = "python -m pyt"
     if sys.argv[0].endswith("__main__.py"):
         executable = os.path.basename(sys.executable)
         sys.argv[0] = executable + " -m pyt"

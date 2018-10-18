@@ -43,3 +43,9 @@ def chain(*sequences):
         sequences = sequences[0]
     return itertools.chain(*sequences)
 
+
+def modname():
+    """Returns the main module name (so this should return "pyt")"""
+    name = __name__.split(".")[0]
+    return name
+

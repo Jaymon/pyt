@@ -14,16 +14,10 @@ import logging
 import sys
 
 
-#logging.basicConfig(format="[%(levelname).1s] %(message)s", level=logging.WARNING, stream=sys.stderr)
-#logging.basicConfig(format="[%(levelname).1s] %(message)s", level=logging.DEBUG, stream=sys.stderr)
-
-
 from .tester import main # so you can do pyt.main like unittest.main
 
 
 __version__ = '0.7.31'
-
-
 
 
 def get_counts():

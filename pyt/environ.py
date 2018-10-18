@@ -18,31 +18,13 @@ class TestEnviron(object):
     """singleton"""
 
     def __init__(self, **kwargs):
-        #self.buffer = kwargs.pop("buffer", False)
-        #self.debug = kwargs.pop("debug", False)
-        #self.warnings = kwargs.pop("warnings", False)
         self.counter = Counter()
-#         #pout.v(os.getcwd())
-#         self.basedir = self.normalize_dir(os.getcwd())
 
     @classmethod
     def get_instance(cls, **kwargs):
         if kwargs or not cls._instance:
             cls._instance = cls(**kwargs)
         return cls._instance
-
-#     def normalize_dir(self, d):
-#         """get rid of things like ~/ and ./ on a directory
-# 
-#         :param d: string, the directory to normalize
-#         :returns: string, d, now with 100% more absolute path
-#         """
-#         d = os.path.expanduser(d)
-#         d = os.path.abspath(d)
-#         return d
-# 
-#     def unbuffer(self):
-#         self.buffer = False
 
     def update_env_for_test(self, test_count):
         # not sure how much I love messing with the environment right here, but this

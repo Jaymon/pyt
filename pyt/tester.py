@@ -2,7 +2,6 @@
 # https://docs.python.org/2/library/unittest.html
 from __future__ import unicode_literals, division, print_function, absolute_import
 import os
-import unittest
 from unittest import (
     TestLoader as BaseTestLoader,
     TextTestRunner as BaseTestRunner,
@@ -21,14 +20,20 @@ import warnings
 from .compat import *
 from .utils import testpath, classpath, chain
 from .environ import TestEnviron
-from .path import PathGuesser, PathFinder
+from .path import PathGuesser, PathFinder, RerunFile
 
 
 logger = logging.getLogger(__name__)
 
 
-# https://hg.python.org/cpython/file/tip/Lib/unittest/suite.py
 class TestSuite(BaseTestSuite):
+    """
+    We override the suite so classes that begin with an underscore will be filtered
+    out from running, this allows us to easily create base TestCase instances and
+    not worry about them being run
+
+    https://github.com/python/cpython/blob/3.7/Lib/unittest/suite.py
+    """
     def addTest(self, test):
         """This will filter out "private" classes that begin with an underscore"""
         add_it = True
@@ -49,10 +54,14 @@ class TestSuite(BaseTestSuite):
         return "\n".join(lines)
 
 
-# https://hg.python.org/cpython/file/648dcafa7e5f/Lib/unittest/loader.py
 class TestLoader(BaseTestLoader):
     """
+    This custom loader acts as the translation layer from the cli to our path
+    guessing and finding classes
+
     https://docs.python.org/2/library/unittest.html#unittest.TestLoader
+    https://github.com/python/cpython/blob/3.7/Lib/unittest/loader.py
+    https://github.com/python/cpython/blob/2.7/Lib/unittest/loader.py
     """
     suiteClass = TestSuite
 
@@ -108,14 +117,10 @@ class TestLoader(BaseTestLoader):
         return ts
 
 
-# https://hg.python.org/cpython/file/648dcafa7e5f/Lib/unittest/runner.py#l28
 class TestResult(BaseTestResult):
     """
-    This is overridden so I can keep original copies of stdout and stderr, and also
-    so I can have control over the stringIO instances that would be used if buffer is
-    passed in. What was happening previously was our custom test loader would load
-    all the testing modules before unittest had a chance to buffer them, so they would
-    have real references to stdout/stderr and would still print out all the logging.
+    https://github.com/python/cpython/blob/3.7/Lib/unittest/result.py
+    https://github.com/python/cpython/blob/3.7/Lib/unittest/runner.py
     """
     total_tests = 0
 
@@ -133,14 +138,6 @@ class TestResult(BaseTestResult):
             ))
             self.stream.flush()
         super(TestResult, self).startTest(test)
-
-#     def stopTest(self, test):
-#         pout.t()
-#         if self.showAll:
-#             pyt_start = self._pyt_start
-#             pyt_stop = time.time()
-#             self.stream.write(" ({}s) ".format(round(pyt_stop - pyt_start, 2)))
-#             self.stream.flush()
 
     def addSuccess(self, test):
         orig_show_all = self.showAll
@@ -181,29 +178,10 @@ class TestResult(BaseTestResult):
 
 class TestRunner(BaseTestRunner):
     """
-    This sets our custom result class and also makes sure the stream that gets passed
-    to the runner is the correct stderr stream and not a buffered stream, so it can
-    still print out the test information even though it buffers everything else, just
-    like how it is done with the original unittest
-
     https://docs.python.org/3/library/unittest.html#unittest.TextTestRunner
-    https://hg.python.org/cpython/file/648dcafa7e5f/Lib/unittest/runner.py
+    https://github.com/python/cpython/blob/3.7/Lib/unittest/runner.py
     """
     resultclass = TestResult
-
-#     def __init__(self, *args, **kwargs):
-# #         self.environ = TestEnviron.get_instance()
-# #         if self.environ.warnings:
-# #             if is_py2:
-# #                 warnings.filterwarnings("error")
-# #             else:
-# #                 # Changed in version 3.2: Added the warnings argument
-# #                 kwargs["warnings"] = "error"
-#         #stream = self.environ.stderr_stream
-#         super(TestRunner, self).__init__(
-#             *args,
-#             **kwargs
-#         )
 
     def _makeResult(self):
         instance = super(TestRunner, self)._makeResult()
@@ -226,15 +204,20 @@ class TestRunner(BaseTestRunner):
 
         if self.verbosity > 1:
             if len(result.errors) or len(result.failures):
-                count = len(result.errors) + len(result.failures)
-                self.stream.writeln("Failed or errored {} tests".format(count))
-                for testcase, failure in chain(result.errors, result.failures):
-                    self.stream.writeln(testpath(testcase))
+                with RerunFile() as fp:
+                    count = len(result.errors) + len(result.failures)
+                    self.stream.writeln("Failed or errored {} tests:".format(count))
+                    for testcase, failure in chain(result.errors, result.failures):
+                        tp = testpath(testcase)
+                        self.stream.writeln(tp)
+                        fp.writeln(tp)
+                self.stream.writeln("")
 
             if len(result.skipped):
                 self.stream.writeln("Skipped {} tests:".format(len(result.skipped)))
                 for testcase, failure in result.skipped:
                     self.stream.writeln(testpath(testcase))
+                self.stream.writeln("")
 
         return result
 
@@ -293,8 +276,12 @@ class TestProgram(BaseTestProgram):
 
     def createTests(self, *args, **kwargs):
         # if we didn't pass in any test names then we want to find all tests
-        if not self.testNames:
-            self.testNames = [""]
+        test_names = getattr(self, "testNames", [])
+        if len(test_names) == 1 and not test_names[0]:
+            if self.rerun:
+                self.testNames = list(RerunFile())
+                pout.v(self.testNames)
+
         super(TestProgram, self).createTests(*args, **kwargs)
 
         # we want to keep open the possibility of grabbing values from this
@@ -311,6 +298,23 @@ class TestProgram(BaseTestProgram):
         else:
             super(TestProgram, self)._print_help()
 
+    def _getMainArgParser(self, parent):
+        parser = super(TestProgram, self)._getMainArgParser(parent)
+#         parser.add_argument(
+#             'tests',
+#             nargs='*',
+#             default=[""],
+#             help='a list of any number of test modules, classes and test methods.'
+#         )
+
+        # python3 will trigger discovery if no tests are passed in, so we
+        # override that functionality so we get routed to our path guesser
+        for action in parser._actions:
+            if action.dest == "tests":
+                action.default = [""]
+        #pout.v(parser._positionals)
+        return parser
+
     def _getParentArgParser(self):
         from . import __version__ # avoid circular dependency
 
@@ -323,7 +327,7 @@ class TestProgram(BaseTestProgram):
             parser.prog = self.progName
             parser.print_help = self._print_help
             parser.add_argument(
-                '-v', '--verbose', '--debug', '-d',
+                '-v', '--verbose',
                 dest='verbosity',
                 action='store_const',
                 const=2,
@@ -357,6 +361,7 @@ class TestProgram(BaseTestProgram):
             parser.add_argument(
                 'testNames',
                 metavar='tests',
+                default=[""],
                 #dest='testNames',
                 nargs='*',
                 help='a list of any number of test modules, classes and test methods.'
@@ -382,6 +387,20 @@ class TestProgram(BaseTestProgram):
             const="error",
             default="",
             help='Converts warnings into errors'
+        )
+
+        parser.add_argument(
+            '--debug', '-d',
+            dest='verbosity',
+            action='store_const',
+            const=2,
+            help='Verbose output'
+        )
+
+        parser.add_argument(
+            '--rerun',
+            action='store_true',
+            help='Rerun previously failed tests'
         )
 
         return parser

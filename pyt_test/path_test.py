@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
 
-from pyt.path import PathFinder, PathGuesser
+import testdata
+
+from pyt.path import PathFinder, PathGuesser, RerunFile
 from . import TestCase, TestModule
 
 
 class PathFinderTest(TestCase):
     def test__find_prefix_paths(self):
         modpath = testdata.create_module("find.prefix.paths.whew_test")
-        pf = tester.PathFinder(basedir=modpath.basedir)
+        pf = PathFinder(basedir=modpath.basedir)
         r = list(pf._find_prefix_paths(pf.basedir, "find.paths"))
         self.assertEqual(1, len(r))
 
@@ -17,7 +19,7 @@ class PathFinderTest(TestCase):
         other_modpath = testdata.create_module("tests.fpp_test", [], other_basedir)
         modpath = testdata.create_module("tests.fpp_test", [], basedir)
 
-        pf = tester.PathFinder(basedir=basedir)
+        pf = PathFinder(basedir=basedir)
         r = list(pf._find_prefix_paths(basedir, "tests"))
         self.assertEqual(2, len(r))
 
@@ -32,7 +34,7 @@ class PathFinderTest(TestCase):
                 "        pass",
             ],
         )
-        pf = tester.PathFinder(basedir=modpath.basedir, prefix="*bar", module_name="*foo")
+        pf = PathFinder(basedir=modpath.basedir, prefix="*bar", module_name="*foo")
         r = list(pf.paths())
         self.assertEqual(1, len(r))
 
@@ -48,13 +50,14 @@ class PathFinderTest(TestCase):
         r = pf._find_basename("*foo", ["globfoo_test.py", "__init__.py"], is_prefix=True)
         self.assertEqual("globfoo_test.py", r)
 
-        pf = tester.PathFinder(basedir=modpath.basedir, prefix="bar", module_name="foo")
+        pf = PathFinder(basedir=modpath.basedir, prefix="bar", module_name="foo")
         r = list(pf.paths())
         self.assertEqual(0, len(r))
 
     def test_issue_24(self):
+        """Turns out I can't fix this issue, so this test is kind of useless"""
         # trying to setup the environment according to: https://github.com/Jaymon/pyt/issues/24
-        #raise self.skipTest("still working on this")
+        raise self.skipTest("won't fix")
         basedir = testdata.create_dir()
         other_basedir = testdata.create_dir("other/directory", basedir)
 
@@ -84,7 +87,7 @@ class PathFinderTest(TestCase):
 
         #pout.v(basedir, other_modpath.path, modpath.path)
 
-        pf = tester.PathFinder(
+        pf = PathFinder(
             basedir=basedir,
             module_name="model24",
             prefix="i24tests",
@@ -97,7 +100,7 @@ class PathFinderTest(TestCase):
         self.assertNotEqual(r[0], r[1])
 
     def test__find_basename(self):
-        pf = tester.PathFinder(basedir="/does/not/matter")
+        pf = PathFinder(basedir="/does/not/matter")
         r = pf._find_basename("foo", ["foo2_test"])
         self.assertEqual("foo2_test", r)
 
@@ -120,7 +123,7 @@ class PathFinderTest(TestCase):
             ]
         })
 
-        pf = tester.PathFinder(
+        pf = PathFinder(
             basedir=path,
             module_name="che",
             prefix="foo/bar",
@@ -128,7 +131,7 @@ class PathFinderTest(TestCase):
         )
         self.assertEqual(1, len(list(pf.paths())))
 
-        pf = tester.PathFinder(
+        pf = PathFinder(
             basedir=path,
             module_name="foo",
             prefix="",
@@ -136,7 +139,7 @@ class PathFinderTest(TestCase):
         )
         self.assertEqual(2, len(list(pf.paths())))
 
-        pf = tester.PathFinder(
+        pf = PathFinder(
             basedir=path,
             method_name="boo",
             class_name="Issue26",
@@ -144,26 +147,16 @@ class PathFinderTest(TestCase):
             prefix="foo_test",
             filepath="",
         )
-        ti = tester.PathGuesser("foo_test.bar.Issue26.boo", path)
+        ti = PathGuesser("foo_test.bar.Issue26.boo", path)
         self.assertEqual("test_boo", list(pf.method_names())[0][1])
 
-        pf = tester.PathFinder(
+        pf = PathFinder(
             basedir=path,
             module_name="bar",
             prefix="foo",
             filepath="",
         )
         self.assertEqual(1, len(list(pf.paths())))
-
-
-
-        #pout.v(list(pf.paths()))
-        #pout.v(pf)
-#         return
-# 
-#         ti = tester.PathGuesser("foo.bar", path)
-#         pout.v(ti.possible)
-
 
     def test_method_names(self):
         m = TestModule(
@@ -306,5 +299,37 @@ class PathGuesserTest(TestCase):
     def test_no_name(self):
         ti = PathGuesser('', '/tmp')
         self.assertEqual(1, len(ti.possible))
+
+
+
+class RerunFileTest(TestCase):
+    def test_rerun(self):
+        m = TestModule(
+            "class RerunTestCase(TestCase):",
+            "    def test_success(self):",
+            "        pass",
+            "",
+            "    def test_error(self):",
+            "        raise ValueError()",
+            "",
+            "    def test_failure(self):",
+            "        self.assertTrue(False)",
+            "",
+        )
+        s = m.client
+
+        r = s.run("--verbose", code=1)
+
+        rf = RerunFile()
+        for line in rf:
+            self.assertTrue(line)
+            self.assertTrue(line in rf)
+
+        r = s.run("--rerun", code=1)
+        self.assertTrue("Ran 2 tests" in r)
+        for line in rf:
+            self.assertTrue(line)
+            self.assertTrue(line in rf)
+
 
 

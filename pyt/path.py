@@ -10,9 +10,36 @@ import logging
 import hashlib
 
 from .compat import *
-
+from .utils import modname
 
 logger = logging.getLogger(__name__)
+
+
+class RerunFile(object):
+    def __init__(self):
+        import tempfile
+        self.filepath = os.path.join(tempfile.gettempdir(), "{}.txt".format(modname()))
+
+    def __enter__(self):
+        self.fp = open(self.filepath, encoding="utf-8", mode="w+")
+        return self
+
+    def writeln(self, s):
+        self.fp.write(s)
+        self.fp.write("\n")
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        self.fp.close()
+        self.fp = None
+
+    def read(self):
+        with open(self.filepath, encoding="utf-8", mode="r+") as fp:
+            return fp.read()
+
+    def __iter__(self):
+        with open(self.filepath, encoding="utf-8", mode="r+") as fp:
+            for line in fp:
+                yield line.strip()
 
 
 class PathGuesser(object):
@@ -173,24 +200,9 @@ class PathFinder(object):
         for p in self.paths():
             # http://stackoverflow.com/questions/67631/
             try:
-#                 module_name = self.module_path(p)
-#                 m = import_path(p)
-#                 m.__name__ = module_name
-#                 pout.v(m.__name__)
-
-
                 module_name = self.module_path(p)
                 logger.debug("Importing {} from path {}".format(module_name, p))
                 m = importlib.import_module(module_name)
-
-                # I don't really like this solution, it seems like a hacky way
-                # to solve: https://github.com/Jaymon/pyt/issues/24
-#                 if is_py2:
-#                     module_hash = hashlib.md5(str(p)).hexdigest()
-#                 else:
-#                     module_hash = hashlib.md5(str(p).encode("utf-8")).hexdigest()
-#                 sys.modules[module_hash] = sys.modules.pop(module_name)
-
                 yield m
 
             except Exception as e:
@@ -559,14 +571,6 @@ class PathFinder(object):
                 discarded = path_args[0:-1]
 
         modpath.append(basename)
-        #pout.v(modpath, discarded)
-
-#         if discarded:
-#             logger.debug(
-#                 'Removed {} from {} because is is not a python module'.format(
-#                 os.path.join(discarded), filepath
-#             ))
-
 
         # convert the remaining file path to a python module path that can be imported
         module_name = '.'.join(modpath)

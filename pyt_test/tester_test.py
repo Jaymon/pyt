@@ -707,26 +707,6 @@ class TestLoaderTest(TestCase):
 
 
 # class TestResultTest(TestCase):
-#     def test_rerun(self):
-#         raise self.skipTest()
-#         m = TestModule(
-#             "from unittest import TestCase",
-#             "",
-#             "class RerunTestCase(TestCase):",
-#             "    def test_success(self):",
-#             "        pass",
-#             "",
-#             "    def test_error(self):",
-#             "        raise ValueError()",
-#             "",
-#             "    def test_failure(self):",
-#             "        self.assertTrue(False)",
-#             "",
-#         )
-# 
-#         r = m.run()
-#         pout.v(r)
-# 
 #     def test_buffering(self):
 #         m = TestModule(
 #             "from __future__ import print_function",
