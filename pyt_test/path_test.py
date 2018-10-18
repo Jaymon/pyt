@@ -2,7 +2,7 @@
 from __future__ import unicode_literals, division, print_function, absolute_import
 
 from pyt.path import PathFinder, PathGuesser
-from . import TestCase
+from . import TestCase, TestModule
 
 
 class PathFinderTest(TestCase):
@@ -220,14 +220,48 @@ class PathFinderTest(TestCase):
         cs = list(tc.classes())
         self.assertEqual(1, len(cs))
 
+    def test_module_path(self):
+        m = TestModule(
+            "class ModulePathCase(TestCase):",
+            "   def test_one(self): pass",
+        )
+        pf = m.pathfinder
+
+        m2 = TestModule(
+            "class ModulePath2Case(TestCase):",
+            "   def test_two(self): pass",
+        )
+        r = pf.module_path(m2.path)
+        self.assertEqual(m2.module, r)
+
+        r = pf.module_path(m.path)
+        self.assertEqual(m.module, r)
+
 
 class PathGuesserTest(TestCase):
     def test_filename(self):
-        ti = tester.PathGuesser("foo/bar/che.py", '/tmp')
-        self.assertEqual("/tmp/foo/bar/che.py", list(ti.possible[0].paths())[0])
+        ti = PathGuesser("foo/bar/che.py", '/tmp')
+        self.assertEqual(1, len(list(ti.possible)))
+        p = list(ti.possible)[0]
+        self.assertEqual("/tmp/foo/bar/che.py", list(p.paths())[0])
 
-        ti = tester.PathGuesser("/foo/bar/che.py", '/tmp')
-        self.assertEqual("/foo/bar/che.py", list(ti.possible[0].paths())[0])
+        ti = PathGuesser("/foo/bar/che.py", '/tmp')
+        self.assertEqual(1, len(list(ti.possible)))
+        p = list(ti.possible)[0]
+        self.assertEqual("/foo/bar/che.py", list(p.paths())[0])
+
+        ti = PathGuesser("/foo/bar.py:Che.baz", "/tmp")
+        p = list(ti.possible)[0]
+        self.assertEqual("Che", p.class_name)
+        self.assertEqual("baz", p.method_name)
+        self.assertEqual("/foo/bar.py", p.filepath)
+
+        ti = PathGuesser("/foo/bar.py:baz", "/tmp")
+        p = list(ti.possible)[0]
+        with self.assertRaises(AttributeError):
+            p.class_name
+        self.assertEqual("baz", p.method_name)
+        self.assertEqual("/foo/bar.py", p.filepath)
 
     def test_set_possible(self):
         tests = (
@@ -263,14 +297,14 @@ class PathGuesserTest(TestCase):
         )
 
         for test_in, test_out in tests:
-            ti = tester.PathGuesser(test_in, '/tmp')
+            ti = PathGuesser(test_in, '/tmp')
             for i, to in enumerate(test_out):
                 for k, v in to.items():
                     r = getattr(ti.possible[i], k)
                     self.assertEqual(v, r)
 
     def test_no_name(self):
-        ti = tester.PathGuesser('', '/tmp')
+        ti = PathGuesser('', '/tmp')
         self.assertEqual(1, len(ti.possible))
 
 

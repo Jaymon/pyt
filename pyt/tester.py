@@ -58,9 +58,9 @@ class TestLoader(BaseTestLoader):
     def loadTestsFromName(self, name, *args, **kwargs):
         ts = self.suiteClass()
         environ = TestEnviron.get_instance()
-        ti = PathGuesser(name, environ.basedir, self.testMethodPrefix)
+        ti = PathGuesser(name, method_prefix=self.testMethodPrefix)
         found = False
-        logger.debug("Searching for tests in directory: {}".format(environ.basedir))
+        logger.debug("Searching for tests in directory: {}".format(ti.basedir))
         for i, tc in enumerate(ti.possible, 1):
             logger.debug("{}. Searching for tests matching:".format(i))
             logger.debug("    {}".format(tc))
@@ -114,36 +114,7 @@ class TestResult(BaseTestResult):
     """
     total_tests = 0
 
-#     def __init__(self, stream=None, descriptions=None, verbosity=None):
-#         pout.v(verbosity)
-#         super(TestResult, self).__init__(stream, descriptions, verbosity)
-
-#     def startTest(self, test):
-#         """ran once before each TestCase"""
-#         self._pyt_start = time.time()
-# 
-#         logger.debug("{}/{} - Starting {}".format(
-#             self.testsRun + 1,
-#             self.total_tests,
-#             testpath(test)
-#         ))
-#         super(TestResult, self).startTest(test)
-
-#     def stopTest(self, test):
-#         """ran once after each TestCase"""
-#         super(TestResult, self).stopTest(test)
-# 
-#         pyt_start = self._pyt_start
-#         del(self._pyt_start)
-# 
-#         pyt_stop = time.time()
-# 
-#         logger.debug("Stopping {} after {}s".format(
-#             testpath(test),
-#             round(pyt_stop - pyt_start, 2)
-#         ))
-
-    def show_status(self, status):
+    def _show_status(self, status):
         pyt_start = self._pyt_start
         pyt_stop = time.time()
         self.stream.writeln("{} ({}s)".format(status, round(pyt_stop - pyt_start, 2)))
@@ -169,7 +140,7 @@ class TestResult(BaseTestResult):
     def addSuccess(self, test):
         orig_show_all = self.showAll
         if self.showAll:
-            self.show_status("ok")
+            self._show_status("ok")
             self.showAll = False
         super(TestResult, self).addSuccess(test)
         self.showAll = orig_show_all
@@ -177,37 +148,30 @@ class TestResult(BaseTestResult):
     def addError(self, test, err):
         orig_show_all = self.showAll
         if self.showAll:
-            self.show_status("ERROR")
+            self._show_status("ERROR")
         super(TestResult, self).addError(test, err)
         self.showAll = orig_show_all
 
     def addFailure(self, test, err):
         orig_show_all = self.showAll
         if self.showAll:
-            self.show_status("FAIL")
+            self._show_status("FAIL")
         super(TestResult, self).addFailure(test, err)
         self.showAll = orig_show_all
 
     def addExpectedFailure(self, test, err):
         orig_show_all = self.showAll
         if self.showAll:
-            self.show_status("expected failure")
+            self._show_status("expected failure")
         super(TestResult, self).addExpectedFailure(test, err)
         self.showAll = orig_show_all
 
     def addUnexpectedSuccess(self, test):
         orig_show_all = self.showAll
         if self.showAll:
-            self.show_status("unexpected success")
+            self._show_status("unexpected success")
         super(TextTestResult, self).addUnexpectedSuccess(test)
         self.showAll = orig_show_all
-
-#     def __init__(self, *args, **kwargs):
-#         super(TestResult, self).__init__(*args, **kwargs)
-#         self._original_stdout = TestEnviron.stdout_stream
-#         self._original_stderr = TestEnviron.stderr_stream
-#         self._stdout_buffer = TestEnviron.stdout_buffer
-#         self._stderr_buffer = TestEnviron.stderr_buffer
 
 
 class TestRunner(BaseTestRunner):
@@ -261,7 +225,6 @@ class TestRunner(BaseTestRunner):
         return result
 
 
-
 class TestProgram(BaseTestProgram):
     """
     https://github.com/python/cpython/blob/3.7/Lib/unittest/main.py
@@ -302,18 +265,18 @@ class TestProgram(BaseTestProgram):
 
         ret = super(TestProgram, self).parseArgs(argv)
 
-#         if self.verbosity > 1:
-#             logger_name = __name__.split(".")[0]
-#             logger.setLevel(logging.DEBUG)
-#             logger2 = logging.getLogger(logger_name)
-#             #logger = logging.getLogger()
-#             pout.v(logger2, logger.parent)
-#             logger2.setLevel(logging.DEBUG)
-
         # after parent's parseArgs is ran self.testNames should be set and
         # should contain all the passed in patterns pyt can use to find the
-        # tests
+        # tests, but parseArgs() also calls createTests() which uses that
+        # information so by the time we get to right here all tests have been
+        # created
         #pout.v(self.testNames)
+
+    def createTests(self, *args, **kwargs):
+        # if we didn't pass in any test names then we want to find all tests
+        if not self.testNames:
+            self.testNames = [""]
+        return super(TestProgram, self).createTests(*args, **kwargs)
 
     def _getParentArgParser(self):
         from . import __version__ # avoid circular dependency
@@ -338,55 +301,4 @@ class TestProgram(BaseTestProgram):
 
 
 main = TestProgram
-
-# def main2(name="", basedir="", **kwargs):
-#     '''
-#     run the test found with find_test() with unittest
-# 
-#     **kwargs -- dict -- all other args to pass to unittest
-#     '''
-#     ret_code = 0
-# 
-# 
-#     # create the environment
-#     buf = kwargs.pop("buffer", False)
-#     warnings = kwargs.pop("warnings", False)
-#     environ = TestEnviron.get_instance(
-#         buffer=buf,
-#         warnings=warnings
-#     )
-# 
-#     tl = TestLoader(basedir, environ)
-# 
-#     #kwargs.setdefault('argv', [__name__.split(".")[0]])
-#     #kwargs['argv'] = kwargs['argv'] + [name]
-#     kwargs["argv"] = None
-#     kwargs["defaultTest"] = name
-# 
-#     kwargs.setdefault('exit', False)
-#     kwargs.setdefault('testLoader', tl)
-#     kwargs.setdefault('testRunner', TestRunner)
-#     #kwargs.setdefault('testRunner', tr)
-# 
-#     # https://docs.python.org/2/library/unittest.html#unittest.main
-#     try:
-#         ret = unittest.main(**kwargs)
-#         if len(ret.result.errors) or len(ret.result.failures):
-#             ret_code = 1
-# 
-#             # TODO: can we print skipped tests?
-#             logger.debug("Test failures/errors:")
-#             for testcase, failure in chain(ret.result.errors, ret.result.failures):
-#                 logger.debug(testpath(testcase))
-# 
-#         elif not ret.result.testsRun:
-#             ret_code = 1
-# 
-#         logger.debug('Test returned: {}'.format(ret_code))
-# 
-#     finally:
-#         environ.unbuffer()
-# 
-#     return ret_code
-
 

@@ -2,6 +2,7 @@
 from __future__ import unicode_literals, division, print_function, absolute_import
 import os
 import sys
+import logging
 
 import testdata
 from testdata.client import ModuleCommand
@@ -23,9 +24,12 @@ from pyt.environ import TestEnviron
 
 
 #echo.DEBUG = True
-#testdata.basic_logging()
-environ = tester.TestEnviron.get_instance()
-environ.debug = True
+testdata.basic_logging()
+#logger = logging.getLogger("pyt")
+#logger.setLevel(logging.DEBUG)
+
+#environ = tester.TestEnviron.get_instance()
+#environ.debug = True
 
 
 class Client(ModuleCommand):
@@ -58,20 +62,14 @@ class TestModule(object):
     def client(self):
         return Client(cwd=self.cwd)
 
-#     @property
-#     def test(self):
-#         t = Test()
-#         t.module_name = self.name
-#         return t
-
     @property
-    def tl(self):
+    def loader(self):
         tl = TestLoader(self.cwd, TestEnviron())
         return tl
-    loader = tl
+    tl = loader
 
     @property
-    def tci(self):
+    def pathfinder(self):
         """return a PathFinder instance for this module"""
         tc = PathFinder(
             self.cwd,
@@ -79,7 +77,7 @@ class TestModule(object):
             prefix=self.prefix
         )
         return tc
-    pathfinder = tci
+    tci = pathfinder
 
     def __init__(self, *body, **kwargs):
         if "cwd" in kwargs:
@@ -93,8 +91,8 @@ class TestModule(object):
 
         else:
             self.name = "prefix{}.pmod{}_test".format(
-                testdata.get_ascii(5),
-                testdata.get_ascii(5)
+                testdata.get_ascii(5).lower(),
+                testdata.get_ascii(5).lower()
             )
 
         bits = self.name.rsplit('.', 1)
@@ -107,33 +105,50 @@ class TestModule(object):
         if isinstance(self.body, dict):
             for k in self.body:
                 self.body[k] = self._prepare_body(self.body[k])
-            self.path = testdata.create_modules(
+            self.modules = testdata.create_modules(
                 self.body,
                 self.cwd,
                 prefix=self.name,
             )
+            self.path = self.modules.path
 
         else:
-            self.path = testdata.create_module(
-                self.name,
-                self._prepare_body(self.body),
-                self.cwd
-            )
+            if kwargs.get("package", False):
+                self.module = testdata.create_package(
+                    self.name,
+                    self._prepare_body(self.body),
+                    self.cwd
+                )
+            else:
+                self.module = testdata.create_module(
+                    self.name,
+                    self._prepare_body(self.body),
+                    self.cwd
+                )
+
+            self.path = self.module.path
+
 
     def _prepare_body(self, body):
-        import_str = "from unittest import TestCase"
         if isinstance(body, basestring):
             body = list(body.splitlines(False))
         else:
             body = list(body)
 
-        if import_str not in body:
-            if "__future__" in body[0]:
-                body.insert(1, import_str)
-            else:
-                body.insert(0, import_str)
-
-        return body
+        ret = [
+            "# -*- coding: utf-8 -*-",
+            "from __future__ import (",
+            "    unicode_literals,",
+            "    division,",
+            "    print_function,",
+            "    absolute_import",
+            ")",
+            "from unittest import TestCase",
+            "import pyt",
+        ]
+        ret.extend(body)
+        ret.append("")
+        return ret
 
     def run(self, name="", **kwargs):
         if not name:

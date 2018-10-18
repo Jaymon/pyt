@@ -40,7 +40,50 @@ class TestProgramTest(TestCase):
         r = m.client.run("MultiRun.foo MultiRun.bar")
         self.assertTrue("Ran 2 tests" in r)
 
-    def test_buffer(self):
+    def test_blank_run(self):
+        m = TestModule({
+            "blank1_test": [
+                "class OneTest(TestCase):",
+                "    def test_one(self):",
+                "        pass",
+                "",
+            ],
+            "blank2_test": [
+                "class TwoTest(TestCase):",
+                "    def test_two(self):",
+                "        pass",
+                "",
+            ],
+        })
+
+        r = m.client.run()
+        self.assertTrue("Ran 2 tests" in r)
+
+    def test_buffer_1(self):
+        m = TestModule(
+            "class BarTest(TestCase):",
+            "    def test_bar(self):",
+            "        print('in bar test')",
+            "",
+        )
+        s = m.client
+
+        r = s.run("--buffer pmod")
+        self.assertFalse("in bar test" in r)
+
+        r = s.run("pmod.Bar.bar")
+        self.assertTrue("in bar test" in r)
+
+        r = s.run("--buffer pmod.Bar.bar")
+        self.assertFalse("in bar test" in r)
+
+        r = s.run("--buffer pmod.Bar")
+        self.assertFalse("in bar test" in r)
+
+        r = s.run("pmod.Bar")
+        self.assertTrue("in bar test" in r)
+
+    def test_buffer_2(self):
         buffered_s = testdata.get_ascii_words()
         m = TestModule(
             "class BufferTest(TestCase):",
@@ -65,36 +108,32 @@ class TestProgramTest(TestCase):
         self.assertTrue("Guessing name:" in r)
         self.assertFalse(buffered_s in r)
 
+    def test_buffer_3(self):
+        m = TestModule(
+            "class DebugTest(TestCase):",
+            "  def test_debug(self):",
+            "    print('hi')",
+            "",
+        )
+        s = m.client
 
-#     def test_verbose_propagate(self):
-#         m = TestModule(
-#             "class VerboseTest(TestCase):",
-#             "    def test_bar(self): pass",
-#         )
-# 
-#         r = m.client.run("--verbose --buffer {}".format(m.name))
-#         return
+        r = s.run('--buffer --verbose {}'.format(m.name))
+        r2 = s.run('--verbose {}'.format(m.name))
+        r3 = s.run('--buffer {}'.format(m.name))
+        self.assertNotEqual(r, r2)
+        self.assertNotEqual(r, r3)
+        self.assertNotEqual(r2, r3)
 
 
-
-
-
-
-
-class RunTestTest(TestCase):
     def test_multi_cli(self):
         m = TestModule({
             "multicli_test": [
-                "from unittest import TestCase",
-                "",
                 "class OneTest(TestCase):",
                 "    def test_one(self):",
                 "        pass",
                 "",
             ],
             "climulti_test": [
-                "from unittest import TestCase",
-                "",
                 "class TwoTest(TestCase):",
                 "    def test_two(self):",
                 "        pass",
@@ -102,22 +141,33 @@ class RunTestTest(TestCase):
             ],
         })
 
-        c = m.client
-        r = c.run("multicli.One.one climulti.Two.two")
-        pout.v(r)
-        return
+        r = m.client.run("multicli.One.one climulti.Two.two")
+        self.assertTrue("Ran 2 tests" in r)
 
-        r = s.run("--all") # should buffer
-        r2 = s.run("") # should print "in bar test"
-        r3 = s.run("--buffer") # should be just like --all
-        self.assertNotEqual(r, r2)
-        self.assertEqual(r, r3)
+    def test_multiple(self):
+        m = TestModule({
+            "multiple_test": "",
+            "multiple_test.bar_test": [
+                "class BarTest(TestCase):",
+                "   def test_baz(self): pass",
+            ],
+            "multiple_test.che_test": [
+                "class CheTest(TestCase):",
+                "   def test_baz(self): pass",
+            ]
+        })
+
+        s = m.client
+        r = s.run("--verbose bar che")
+        self.assertTrue("bar_test" in r)
+        self.assertTrue("che_test" in r)
+        self.assertEqual(2, r.count("Found 1 total tests"))
 
     def test_double_counting_and_pyc(self):
         """Make sure packages don't get double counted"""
         # https://github.com/Jaymon/pyt/issues/18
         # https://github.com/Jaymon/pyt/issues/19
-        basedir = testdata.create_modules({
+        m = TestModule({
             "dc_test": "",
             "dc_test.bar_test": [
                 "from unittest import TestCase",
@@ -131,115 +181,337 @@ class RunTestTest(TestCase):
             ]
         })
 
-        s = Client(basedir)
-        r = s.run("dc_test --debug")
-        self.assertTrue("Found 2 total tests" in r)
+        s = m.client
+        s.environ["PYTHONDONTWRITEBYTECODE"] = "0"
+
+        r = s.run("dc_test")
+        self.assertTrue("Ran 2 tests" in r)
 
         # running it again will test for the pyc problem
-        r = s.run("dc_test --debug")
+        r = s.run("--verbose dc_test")
         self.assertFalse("No module named pyc" in r)
 
-        r = s.run("--all --debug")
+        r = s.run("--verbose")
         self.assertTrue("Found 2 total tests" in r)
-
-        r = s.run("--all --debug")
         self.assertFalse("No module named pyc" in r)
-
-    def test_all(self):
-        m = TestModule(
-            "from __future__ import print_function",
-            "from unittest import TestCase",
-            "",
-            "class BarTest(TestCase):",
-            "    def test_bar(self):",
-            "        print('in bar test')",
-            "",
-        )
-
-        s = Client(m.cwd)
-        r = s.run("--all") # should buffer
-        r2 = s.run("") # should print "in bar test"
-        r3 = s.run("--buffer") # should be just like --all
-        self.assertNotEqual(r, r2)
-        self.assertEqual(r, r3)
-
-    def test_multiple(self):
-        basedir = testdata.create_modules({
-            "multiple_test": "",
-            "multiple_test.bar_test": [
-                "from unittest import TestCase",
-                "class BarTest(TestCase):",
-                "   def test_baz(self): pass",
-            ],
-            "multiple_test.che_test": [
-                "from unittest import TestCase",
-                "class CheTest(TestCase):",
-                "   def test_baz(self): pass",
-            ]
-        })
-
-        s = Client(basedir)
-        r = s.run("bar che --debug")
-        self.assertTrue("bar_test" in r)
-        self.assertTrue("che_test" in r)
-        self.assertEqual(2, r.count("Ran 1 test"))
-
-    def test_buffer(self):
-        m = TestModule(
-            "from __future__ import print_function",
-            "from unittest import TestCase",
-            "",
-            "class BarTest(TestCase):",
-            "    def test_bar(self):",
-            "        print('in bar test')",
-            "",
-        )
-
-        s = Client(m.cwd)
-        r = s.run("pmod --buffer")
-        self.assertFalse("in bar test" in r)
-
-        r = s.run("pmod.Bar.bar")
-        self.assertTrue("in bar test" in r)
-
-        r = s.run("pmod.Bar.bar --buffer")
-        self.assertFalse("in bar test" in r)
-
-        r = s.run("pmod.Bar --buffer")
-        self.assertFalse("in bar test" in r)
-
-        r = s.run("pmod.Bar")
-        self.assertTrue("in bar test" in r)
 
     def test_filepath(self):
-        m = testdata.create_module("filepath_test", [
-            "from unittest import TestCase",
+        m = TestModule([
             "class FooTest(TestCase):",
             "    def test_foo(self):",
             "        pass",
-            "",
         ])
+        s = m.client
 
-        s = Client(m.basedir)
-        s.run("{}".format(m.module.__file__))
-        s.run("{}:Foo".format(m.module.__file__))
-        s.run("{}:Foo.foo".format(m.module.__file__))
-        with self.assertRaises(RuntimeError):
-            s.run("{}:Bah".format(m.module.__file__))
+        r = s.run("--verbose {}:Bah".format(m.path))
+        self.assertTrue("Ran 0 tests" in r)
+
+        r = s.run("--verbose {}".format(m.path))
+        self.assertTrue("Ran 1 test" in r)
+
+        r = s.run("{}:Foo".format(m.path))
+        self.assertTrue("Ran 1 test" in r)
+
+        r = s.run("{}:Foo.foo".format(m.path))
+        self.assertTrue("Ran 1 test" in r)
 
     def test_package(self):
-        m = testdata.create_package("foo_test", [
-            "from __future__ import print_function",
-            "from unittest import TestCase",
+        m = TestModule([
             "class FooTest(TestCase):",
             "    def test_foo(self):",
             "        print('in foo test')",
             "",
+        ], package=True)
+
+        s = m.client
+        r = s.run("--verbose {}".format(m.name))
+        self.assertTrue("in foo test" in r)
+
+    def test_skip_tests(self):
+        """https://github.com/Jaymon/pyt/issues/27"""
+        m = TestModule(
+            "class SkipTTest(TestCase):",
+            "    @classmethod",
+            "    def setUpClass(cls):",
+            "        pyt.skip_multi_class()",
+            "",
+            "    def test_bar(self): pass",
+        )
+        c = m.client
+        r = c.run('--verbose SkipT.bar')
+        self.assertTrue("Ran 1 test" in r)
+
+    def test_parse_error_1(self):
+        m = TestModule({
+            'tests_parse_error': 'from unittest import TestCase',
+            'tests_parse_error.pefoo_test': [
+                'from . import TestCase',
+                '',
+                'class PEFooTest(TestCase):',
+                '    def test_bar(self):',
+                '        foo = "this is a parse error'
+            ]
+        })
+        s = m.client
+
+        with self.assertRaises(RuntimeError):
+            ret_code = s.run('PEFoo.bar')
+
+    def test_parse_error_2(self):
+        m = TestModule(
+            "class ParseErrorTest(TestCase):",
+            "  count = 5",
+            "  return", # a return not in a method?
+        )
+        s = m.client
+
+        with self.assertRaises(RuntimeError):
+            r = s.run(m.name)
+
+    def test_testcase_not_found(self):
+        """ https://github.com/Jaymon/pyt/issues/1 """
+        m = TestModule(
+            "class BARTest(TestCase):",
+            "  def test_che(self): pass"
+            "",
+        )
+        s = m.client
+
+        r = s.run('--verbose {}.BARTest.test_che'.format(m.name))
+        self.assertTrue('test_che ({}.BARTest)'.format(m.name) in r)
+
+    def test_error_print_on_failure(self):
+        """tests weren't printing errors even on total failure, this makes sure
+        that's fixed"""
+        m = TestModule(
+            "import something_that_does_not_exist"
+        )
+        s = m.client
+
+        r = s.run('', code=1)
+        self.assertTrue(len(r) > 0)
+
+    def test_failfast_1(self):
+        m = TestModule([
+            "class FailFastTestCase(TestCase):",
+            "   def test_aoo(self):",
+            "       self.assertTrue(True)",
+            "",
+            "   def test_foo(self):",
+            "       self.assertTrue(False)",
+            "",
+            "   def test_zoo(self):",
+            "       self.assertTrue(True)",
+        ])
+        s = m.client
+
+        r = s.run('--failfast', code=1)
+        self.assertTrue('.F.' not in r)
+
+        r = s.run('', code=1)
+        self.assertTrue('.F.' in r)
+
+    def test_failfast_2(self):
+        m = TestModule([
+            "class BarTest(TestCase):",
+            "    def test_1bar(self):",
+            "        print('in bar test')",
+            "        self.assertTrue(False)",
+            "    def test_2foo(self):",
+            "        print('in foo test')",
         ])
 
-        s = Client(m.basedir)
-        r = s.run("foo_test")
-        self.assertTrue("in foo test" in r)
+        s = m.client
+        r = s.run("-fb", code=1)
+        self.assertTrue("FAIL: test_1bar" in r)
+        self.assertTrue("Ran 1 test" in r)
+
+    def test_relative_import(self):
+        m = TestModule({
+            'ritests': 'from unittest import TestCase',
+            'ritests.foo_test': "\n".join([
+                'from . import TestCase',
+                '',
+                'class FooTest(TestCase):',
+                '    def test_bar(self): pass'
+            ])
+        })
+        s = m.client
+        r = s.run("Foo.bar")
+        self.assertTrue("Ran 1 test" in r)
+
+    def test_cli_errors(self):
+        m = TestModule({
+            'cli_errors': 'from unittest import TestCase',
+            'cli_errors.clibar_test': [
+                'from . import TestCase',
+                '',
+                "raise ValueError('foo')"
+            ],
+            'cli_errors.foo_test': [
+                'from . import TestCase',
+                '',
+                'class CliFooTest(TestCase):',
+                '    def test_bar(self): pass',
+            ]
+        })
+        s = m.client
+
+        r = s.run("cli_errors.")
+        self.assertTrue("Ran 1 test" in r)
+
+        # if there is an error and no other test is found, bubble up the error
+        m = TestModule(
+            "from unittest import TestCase",
+            "",
+            "raise ValueError('foo')"
+        )
+        s = m.client
+
+        with self.assertRaises(RuntimeError):
+            s.run(m.name_prefix)
+
+    def test_cli_run(self):
+        m = TestModule(
+            "class BarTest(TestCase):",
+            "    def test_foo(self):",
+            "        pass",
+        )
+        s = m.client
+
+        r = s.run('--verbose {}'.format(m.name_prefix))
+        self.assertTrue("Ran 1 test")
+
+        r = s.run('--verbose blah.blarg.blorg')
+        self.assertTrue("Ran 0 tests")
+
+    def test_found_module_ignore_method(self):
+        m = TestModule(
+            "class FooTest(TestCase):",
+            "    def test_foo(self):",
+            "        pass",
+        )
+        s = m.client
+
+        r = s.run('--verbose foo')
+        self.assertTrue('Found method test: {}'.format(m.name) in r)
+
+    def test_ignore_non_test_modules(self):
+        """make sure similar named non-test modules are ignored"""
+        m = TestModule({
+            'tintm.tint_test': "\n".join([
+                "class FooTest(TestCase):",
+                "    def test_foo(self):",
+                "        pass",
+
+            ]),
+            'tintm.tint': ""
+        })
+        s = m.client
+
+        r = s.run('--verbose tint')
+        self.assertEqual(1, r.count('Found module test'))
+
+    def test_prefix_search_1(self):
+        m = TestModule(
+            "class BarTest(TestCase):",
+            "    def test_handshake(self):",
+            "        pass",
+            "    def test_bad_accept_handshake(self):",
+            "        pass",
+            "",
+            "class FooBarTest(TestCase):",
+            "    def test_blah(self):",
+            "        pass",
+            name='prefix_search.chebaz_test'
+        )
+        s = m.client
+
+        r = s.run('--verbose {}.*Bar'.format(m.name))
+        self.assertTrue("Ran 3 tests" in r)
+
+        r = s.run('--verbose Bar.*handshake')
+        self.assertTrue('test_bad_accept_handshake' in r)
+        self.assertTrue('test_handshake' in r)
+
+        r = s.run('--verbose test_handshake')
+        self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
+
+        r = s.run('--verbose Bar.test_handshake')
+        self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
+
+        r = s.run('--verbose che')
+        self.assertTrue('Found module test: prefix_search.chebaz_test' in r)
+
+        r = s.run('--verbose baz')
+        self.assertTrue('Ran 0 tests' in r)
+
+        r = s.run('Bar.handshake --debug')
+        self.assertTrue('bad_accept_handshake' not in r)
+
+        r = s.run('Bar --debug')
+        self.assertTrue('FooBarTest' not in r)
+
+    def test_prefix_search_2(self):
+        m = TestModule(
+            "class FooBarTest(TestCase):",
+            "    def test_blah(self):",
+            "        pass",
+            name='ps2.foobar.chebaz_test'
+        )
+        s = m.client
+
+        r = s.run('foobar.')
+        self.assertTrue("Ran 1 test" in r)
+
+        r = s.run('ps2.')
+        self.assertTrue("Ran 1 test" in r)
+
+    def test_setup(self):
+        m = TestModule(
+            "def setUpModule():",
+            "    print('setUpModule')",
+            "",
+            "def tearDownModule():",
+            "    print('tearDownModule')",
+            "",
+            "class BaseTCase(TestCase):",
+            "    @classmethod",
+            "    def setUpClass(cls):",
+            "         print('setUpClass')",
+            "",
+            "    def setUp(self):",
+            "         print('setUp')",
+            "",
+            "    def tearDown(self):",
+            "         print('tearDown')",
+            "",
+            "    @classmethod",
+            "    def tearDownClass(cls):",
+            "         print('tearDownClass')",
+            "",
+            "    def test_foo(self):",
+            "        pass",
+            "",
+            "class BarTest(BaseTCase):",
+            "    pass"
+        )
+        s = m.client
+
+        r = s.run("--verbose {}".format(m.name_prefix))
+        self.assertTrue("Ran 2 tests" in r)
+        #self.assertTrue("here" in r)
+        return
+
+        pout.b()
+        r = s.run("--verbose {}".format(m.name))
+
+
+
+
+
+class RunTestTest(TestCase):
+
 
     def test_environ_1(self):
         m = TestModule(
@@ -269,23 +541,6 @@ class RunTestTest(TestCase):
             r = s.run('Foo --debug')
 
         r = s.run('pmod --debug')
-
-    def test_skip_tests(self):
-        """https://github.com/Jaymon/pyt/issues/27"""
-        m = TestModule(
-            "from unittest import TestCase",
-            "import pyt",
-            "",
-            "class SkipTTest(TestCase):",
-            "    @classmethod",
-            "    def setUpClass(cls):",
-            "        pyt.skip_multi_class()",
-            "",
-            "    def test_bar(self): pass",
-        )
-        c = m.client
-        r = c.run('SkipT.bar --debug')
-        self.assertTrue("Ran 1 test" in r)
 
     def test_warnings(self):
         """https://github.com/Jaymon/pyt/issues/25"""
@@ -369,362 +624,6 @@ class RunTestTest(TestCase):
         self.assertTrue("Ran 2 tests" in r)
         self.assertTrue("skipped=1" in r)
 
-    def test_debug(self):
-        m = TestModule(
-            "from __future__ import print_function",
-            "from unittest import TestCase",
-            "",
-            "class DebugTest(TestCase):",
-            "  def test_debug(self):",
-            "    print('hi')",
-            "",
-            name="debug_test"
-        )
-
-        s = Client(m.cwd)
-
-        r = s.run('debug_test --buffer --debug')
-        r2 = s.run('debug_test --debug')
-        r3 = s.run('debug_test --buffer')
-        self.assertNotEqual(r, r2)
-        self.assertNotEqual(r, r3)
-        self.assertNotEqual(r2, r3)
-
-    def test_parse_error2(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class ParseErrorTest(TestCase):",
-            "  count = 5",
-            "  return",
-            "",
-            name="parse_error2_test"
-        )
-
-        s = Client(m.cwd)
-
-        with self.assertRaises(RuntimeError):
-            r = s.run('parse_error2_test')
-
-    def test_testcase_not_found(self):
-        """ https://github.com/Jaymon/pyt/issues/1 """
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class BARTest(TestCase):",
-            "  def test_che(self): pass"
-            "",
-            name="foo_test"
-        )
-
-        s = Client(m.cwd)
-
-        r = s.run('foo_test.BARTest.test_che --debug')
-        self.assertTrue('foo_test.BARTest.test_che' in r)
-
-    def test_error_print_on_failure(self):
-        """tests weren't printing errors even on total failure, this makes sure
-        that's fixed"""
-        m = TestModule(
-            "from unittest import TestCase",
-            "import something_that_does_not_exist"
-            "",
-        )
-
-        s = Client(m.cwd)
-
-        r = s.run('--all', code=1)
-        self.assertTrue(len(r) > 0)
-
-    def test_failfast_1(self):
-        m = TestModule([
-            "from unittest import TestCase",
-            "",
-            "class FailFastTestCase(TestCase):",
-            "   def test_aoo(self):",
-            "       self.assertTrue(True)",
-            "",
-            "   def test_foo(self):",
-            "       self.assertTrue(False)",
-            "",
-            "   def test_zoo(self):",
-            "       self.assertTrue(True)",
-        ])
-
-        s = Client(m.cwd)
-
-        r = s.run('--all --failfast', code=1)
-        self.assertTrue('.F.' not in r)
-
-        r = s.run('--all', code=1)
-        self.assertTrue('.F.' in r)
-
-    def test_failfast_2(self):
-        m = TestModule([
-            "from __future__ import print_function",
-            "from unittest import TestCase",
-            "",
-            "class BarTest(TestCase):",
-            "    def test_1bar(self):",
-            "        print('in bar test')",
-            "        self.assertTrue(False)",
-            "    def test_2foo(self):",
-            "        print('in foo test')",
-        ])
-
-        s = m.client
-        r = s.run("-fb", code=1)
-        self.assertTrue("FAIL: test_1bar" in r)
-        self.assertTrue("Ran 1 test" in r)
-
-    def test_parse_error(self):
-        cwd = testdata.create_dir()
-        testdata.create_modules(
-            {
-                'tests_parse_error': 'from unittest import TestCase',
-                'tests_parse_error.pefoo_test': "\n".join([
-                    'from . import TestCase',
-                    '',
-                    'class PEFooTest(TestCase):',
-                    '    def test_bar(self):',
-                    '        foo = "this is a parse error'
-                ])
-            },
-            tmpdir=cwd
-        )
-
-        with self.assertRaises(SyntaxError):
-            ret_code = tester.main('PEFoo.bar', cwd)
-
-    def test_relative_import(self):
-        cwd = testdata.create_dir()
-        testdata.create_modules(
-            {
-                'ritests': 'from unittest import TestCase',
-                'ritests.foo_test': "\n".join([
-                    'from . import TestCase',
-                    '',
-                    'class FooTest(TestCase):',
-                    '    def test_bar(self): pass'
-                ])
-            },
-            tmpdir=cwd
-        )
-
-        ret_code = tester.main('Foo.bar', cwd)
-
-    def test_multi(self):
-        # if there is an error in one of the tests but another test is found, don't
-        # bubble up the error
-        cwd = testdata.create_dir()
-        testdata.create_modules(
-            {
-                'multi.bar_test': "\n".join([
-                    'from unittest import TestCase',
-                    '',
-                    'class BarTest(TestCase):',
-                    '    def test_bar(self): pass',
-                ]),
-                'multi.foo_test': "\n".join([
-                    'from unittest import TestCase',
-                    '',
-                    'class FooTest(TestCase):',
-                    '    def test_foo(self): pass',
-                    '',
-                    'class CheTest(TestCase):',
-                    '    def test_che(self): pass',
-                ])
-            },
-            tmpdir=cwd
-        )
-
-        ret_code = tester.main('multi.', cwd)
-        self.assertEqual(0, ret_code)
-
-    def test_no_tests_found(self):
-        # if there is an error in one of the tests but another test is found, don't
-        # bubble up the error
-        cwd = testdata.create_dir()
-        testdata.create_modules(
-            {
-                'nofound.nofo_test': "\n".join([
-                    'from unittest import TestCase',
-                    '',
-                    'class NofoTest(TestCase):',
-                    '    def test_nofo(self): pass',
-                ]),
-            },
-            tmpdir=cwd
-        )
-
-        ret_code = tester.main('nofound_does_not_exist.', cwd)
-        self.assertEqual(1, ret_code)
-
-    def test_cli_errors(self):
-        # if there is an error in one of the tests but another test is found, don't
-        # bubble up the error
-        cwd = testdata.create_dir()
-        testdata.create_modules(
-            {
-                'cli_2': 'from unittest import TestCase',
-                'cli_2.clibar_test': "\n".join([
-                    'from . import TestCase',
-                    '',
-                    "raise ValueError('foo')"
-                ]),
-                'cli_2.clifoo_test': "\n".join([
-                    'from . import TestCase',
-                    '',
-                    'class CliFooTest(TestCase):',
-                    '    def test_bar(self): pass',
-                ])
-            },
-            tmpdir=cwd
-        )
-
-        ret_code = tester.main('cli_2.', cwd)
-        self.assertEqual(0, ret_code)
-
-        # if there is an error and no other test is found, bubble up the error
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "raise ValueError('foo')"
-        )
-
-        with self.assertRaises(ValueError):
-            ret_code = tester.main(m.name_prefix, m.cwd)
-
-    def test_cli(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class BarTest(TestCase):",
-            "    def test_foo(self):",
-            "        pass",
-        )
-
-        s = Client(m.cwd)
-        r = s.run('pmod --debug')
-
-        with self.assertRaises(RuntimeError):
-            r = s.run('blah.blarg.blorg --debug')
-        #self.assertEqual(0, ret_code)
-
-    def test_found_module_ignore_method(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class FooTest(TestCase):",
-            "    def test_foo(self):",
-            "        pass",
-            name='prefix_search.foo_test'
-        )
-
-        s = Client(m.cwd)
-
-        r = s.run('foo --debug')
-        self.assertTrue('Found module test: prefix_search.foo_test' in r)
-
-    def test_ignore_non_test_modules(self):
-        """make sure similar named non-test modules are ignored"""
-        cwd = testdata.create_dir()
-        testdata.create_modules(
-            {
-                'tintm.tint_test': "\n".join([
-                    "from unittest import TestCase",
-                    "",
-                    "class FooTest(TestCase):",
-                    "    def test_foo(self):",
-                    "        pass",
-
-                ]),
-                'tintm.tint': ""
-            },
-            tmpdir=cwd
-        )
-
-        s = Client(cwd)
-        r = s.run('tint --debug')
-        self.assertEqual(1, r.count('Found module test'))
-
-    def test_prefix_search(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class BarTest(TestCase):",
-            "    def test_handshake(self):",
-            "        pass",
-            "    def test_bad_accept_handshake(self):",
-            "        pass",
-            "",
-            "class FooBarTest(TestCase):",
-            "    def test_blah(self):",
-            "        pass",
-            name='prefix_search.chebaz_test'
-        )
-
-        s = Client(m.cwd)
-
-        r = s.run('test_handshake --debug')
-        self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
-
-        r = s.run('Bar.test_handshake --debug')
-        self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
-
-        r = s.run('che --debug')
-        self.assertTrue('Found module test: prefix_search.chebaz_test' in r)
-
-        with self.assertRaises(RuntimeError):
-            r = s.run('baz --debug')
-
-        # TODO -- maybe add this sometime in the future
-        #r = s.run('Bar.*handshake --debug')
-        #pout.v(r)
-        #self.assertTrue('bad_accept_handshake' not in r)
-
-        r = s.run('Bar.handshake --debug')
-        self.assertTrue('bad_accept_handshake' not in r)
-
-        r = s.run('Bar --debug')
-        self.assertTrue('FooBarTest' not in r)
-
-    def test_prefix_search2(self):
-        m = TestModule(
-            "from unittest import TestCase",
-            "",
-            "class FooBarTest(TestCase):",
-            "    def test_blah(self):",
-            "        pass",
-            name='ps2.foobar.chebaz_test'
-        )
-
-        s = Client(m.cwd)
-        ret_code = tester.main('foobar.', m.cwd)
-        self.assertEqual(0, ret_code)
-
-        ret_code = tester.main('ps2.', m.cwd)
-        self.assertEqual(0, ret_code)
-
-    def test_setup(self):
-        m = TestModule(
-            "from __future__ import print_function",
-            "from unittest import TestCase",
-            "",
-            "def setUpModule():",
-            "    print('here')",
-            "",
-            "class BaseTCase(TestCase):",
-            "    def test_foo(self):",
-            "        pass",
-            "",
-            "class BarTest(BaseTCase):",
-            "    pass"
-        )
-
-        ret_code = tester.main('pmod', m.cwd)
-        self.assertEqual(0, ret_code)
-
     def test_names_1(self):
         m = TestModule(
             "from unittest import TestCase",
@@ -762,6 +661,16 @@ class RunTestTest(TestCase):
 
 
 class TestLoaderTest(TestCase):
+#     def test_basedir(self):
+#         m = TestModule(
+#             "class BasedirTest(TestCase):",
+#             "   def test_one(self): pass",
+#         )
+# 
+#         tl = m.loader
+#         tl.loadTestsFromName(m.path)
+
+
     def test_private_testcase(self):
         # https://github.com/Jaymon/pyt/issues/17
         m = TestModule(

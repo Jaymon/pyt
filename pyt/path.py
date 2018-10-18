@@ -25,8 +25,10 @@ class PathGuesser(object):
 
     https://docs.python.org/3/library/unittest.html#test-discovery
     """
-    def __init__(self, name, basedir, method_prefix='test', **kwargs):
+    def __init__(self, name, basedir="", method_prefix='test', **kwargs):
         self.name = name
+        if not basedir:
+            basedir = os.getcwd()
         self.basedir = basedir
         self.method_prefix = method_prefix
         self.set_possible()
@@ -47,7 +49,7 @@ class PathGuesser(object):
         '''
         possible = []
         name = self.name
-        logger.debug('Guessing name: {}'.format(name))
+        logger.debug('Guessing test name: {}'.format(name))
 
         name_f = self.name.lower()
         filepath = ""
@@ -55,15 +57,18 @@ class PathGuesser(object):
             # path/something:Class.method
             bits = name.split(":", 1)
             filepath = bits[0]
-            name = bits[1] if len(bits) > 1 else ""
             logger.debug('Found filepath: {}'.format(filepath))
+
+            name = bits[1] if len(bits) > 1 else ""
+            if name:
+                logger.debug('Found test name: {} for filepath: {}'.format(name, filepath))
 
         bits = name.split('.')
         basedir = self.basedir
         method_prefix = self.method_prefix
 
         # check if the last bit is a Class
-        if re.search(r'^[A-Z]', bits[-1]):
+        if re.search(r'^\*?[A-Z]', bits[-1]):
             logger.debug('Found class in name: {}'.format(bits[-1]))
             possible.append(PathFinder(basedir, method_prefix, **{
                 'class_name': bits[-1],
@@ -71,7 +76,7 @@ class PathGuesser(object):
                 'prefix': os.sep.join(bits[0:-2]),
                 'filepath': filepath,
             }))
-        elif len(bits) > 1 and re.search(r'^[A-Z]', bits[-2]):
+        elif len(bits) > 1 and re.search(r'^\*?[A-Z]', bits[-2]):
             logger.debug('Found class in name: {}'.format(bits[-2]))
             possible.append(PathFinder(basedir, method_prefix, **{
                 'class_name': bits[-2],
@@ -82,26 +87,39 @@ class PathGuesser(object):
             }))
         else:
             if self.name:
-                logger.debug('Name is ambiguous')
-                possible.append(PathFinder(basedir, method_prefix, **{
-                    'module_name': bits[-1],
-                    'prefix': os.sep.join(bits[0:-1]),
-                    'filepath': filepath,
-                }))
-                possible.append(PathFinder(basedir, method_prefix, **{
-                    'method_name': bits[-1],
-                    'module_name': bits[-2] if len(bits) > 1 else '',
-                    'prefix': os.sep.join(bits[0:-2]),
-                    'filepath': filepath,
-                }))
-                possible.append(PathFinder(basedir, method_prefix, **{
-                    'prefix': os.sep.join(bits),
-                    'filepath': filepath,
-                }))
+                if filepath:
+                    if len(bits):
+                        possible.append(PathFinder(basedir, method_prefix, **{
+                            'filepath': filepath,
+                            'method_name': bits[0],
+                        }))
+                    else:
+                        possible.append(PathFinder(basedir, method_prefix, **{
+                            'filepath': filepath,
+                        }))
+
+                else:
+                    logger.debug('Test name is ambiguous')
+                    possible.append(PathFinder(basedir, method_prefix, **{
+                        'module_name': bits[-1],
+                        'prefix': os.sep.join(bits[0:-1]),
+                        'filepath': filepath,
+                    }))
+                    possible.append(PathFinder(basedir, method_prefix, **{
+                        'method_name': bits[-1],
+                        'module_name': bits[-2] if len(bits) > 1 else '',
+                        'prefix': os.sep.join(bits[0:-2]),
+                        'filepath': filepath,
+                    }))
+                    possible.append(PathFinder(basedir, method_prefix, **{
+                        'prefix': os.sep.join(bits),
+                        'filepath': filepath,
+                    }))
 
             else:
                 possible.append(PathFinder(basedir, method_prefix, filepath=filepath))
 
+        logger.debug("Found {} possible test names".format(len(possible)))
         self.possible = possible
 
 
@@ -134,7 +152,7 @@ class PathFinder(object):
 
     def __str__(self):
         ret = ''
-        for k in ['prefix', 'module_name', 'class_name', 'method_name']:
+        for k in ['prefix', 'module_name', 'class_name', 'method_name', 'filepath']:
             v = getattr(self, k, None)
             if v:
                 ret += "{}: {}, ".format(k, v)
@@ -162,15 +180,16 @@ class PathFinder(object):
 
 
                 module_name = self.module_path(p)
+                logger.debug("Importing {} from path {}".format(module_name, p))
                 m = importlib.import_module(module_name)
 
                 # I don't really like this solution, it seems like a hacky way
                 # to solve: https://github.com/Jaymon/pyt/issues/24
-                if is_py2:
-                    module_hash = hashlib.md5(str(p)).hexdigest()
-                else:
-                    module_hash = hashlib.md5(str(p).encode("utf-8")).hexdigest()
-                sys.modules[module_hash] = sys.modules.pop(module_name)
+#                 if is_py2:
+#                     module_hash = hashlib.md5(str(p)).hexdigest()
+#                 else:
+#                     module_hash = hashlib.md5(str(p).encode("utf-8")).hexdigest()
+#                 sys.modules[module_hash] = sys.modules.pop(module_name)
 
                 yield m
 
@@ -194,7 +213,11 @@ class PathFinder(object):
             class_name = getattr(self, 'class_name', '')
             class_regex = ''
             if class_name:
-                class_regex = re.compile(r'^{}'.format(class_name), re.I)
+                if class_name.startswith("*"):
+                    class_name = class_name.strip("*")
+                    class_regex = re.compile(r'.*?{}'.format(class_name), re.I)
+                else:
+                    class_regex = re.compile(r'^{}'.format(class_name), re.I)
 
             for c_name, c in cs:
                 can_yield = True
@@ -217,13 +240,21 @@ class PathFinder(object):
             method_regex = ''
             if method_name:
                 if method_name.startswith(self.method_prefix):
-                    method_regex = re.compile(r'^{}'.format(method_name), re.I)
+                    method_regex = re.compile(r'^{}'.format(method_name), flags=re.I)
 
                 else:
-                    method_regex = re.compile(
-                        r'^{}[_]{{0,1}}{}'.format(self.method_prefix, method_name),
-                        re.I
-                    )
+
+                    if method_name.startswith("*"):
+                        method_name = method_name.strip("*")
+                        method_regex = re.compile(
+                            r'^{}[_]{{0,1}}.*?{}'.format(self.method_prefix, method_name),
+                            flags=re.I
+                        )
+                    else:
+                        method_regex = re.compile(
+                            r'^{}[_]{{0,1}}{}'.format(self.method_prefix, method_name),
+                            flags=re.I
+                        )
 
             for m_name, m in ms:
                 if not m_name.startswith(self.method_prefix): continue
@@ -422,8 +453,6 @@ class PathFinder(object):
                     break
         return ret
 
-
-
     def walk(self, basedir):
         """Walk all the directories of basedir except hidden directories
 
@@ -508,31 +537,41 @@ class PathFinder(object):
     def module_path(self, filepath):
         """given a filepath like /base/path/to/module.py this will convert it to
         path.to.module so it can be imported"""
-        basedir = self.basedir
-        module_name = filepath.replace(basedir, '', 1)
-        module_name = module_name.strip('\\/')
+        possible_modbits = re.split('[\\/]', filepath.strip('\\/'))
+        basename = possible_modbits[-1]
+        prefixes = possible_modbits[0:-1]
+        modpath = []
+        discarded = []
 
-        # remove all dirs that don't have an __init__.py file (ie, they're not modules)
-        modules = re.split('[\\/]', module_name)
-        module_count = len(modules)
-        if module_count > 1:
-            for x in range(module_count):
-                path_args = [basedir]
-                path_args.extend(modules[0:x + 1])
-                path_args.append('__init__.py')
-                module_init = os.path.join(*path_args)
-                if os.path.isfile(module_init): break
+        # find the first directory that has an __init__.py
+        for i in range(len(prefixes)):
+            path_args = ["/"]
+            path_args.extend(prefixes[0:i+1])
+            path_args.append('__init__.py')
+            prefix_module = os.path.join(*path_args)
+            #logger.debug("Checking prefix modulepath: {}".format(prefix_module))
+            if os.path.isfile(prefix_module):
+                #logger.debug("Found start of modulepath: {}".format(prefixes[i]))
+                modpath = prefixes[i:]
+                break
 
-            if x > 1:
-                logger.debug(
-                    'Removed {} from {} because is is not a python module'.format(
-                    os.sep.join(modules[0:x]), module_name
-                ))
+            else:
+                discarded = path_args[0:-1]
 
-            module_name = '.'.join(modules[x:])
+        modpath.append(basename)
+        #pout.v(modpath, discarded)
+
+#         if discarded:
+#             logger.debug(
+#                 'Removed {} from {} because is is not a python module'.format(
+#                 os.path.join(discarded), filepath
+#             ))
+
 
         # convert the remaining file path to a python module path that can be imported
+        module_name = '.'.join(modpath)
         module_name = re.sub(r'(?:\.__init__)?\.py$', '', module_name, flags=re.I)
+        logger.debug("Module path {} found in filepath {}".format(module_name, filepath))
         return module_name
 
 
