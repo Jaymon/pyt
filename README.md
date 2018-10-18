@@ -1,34 +1,24 @@
 # Pyt 
 
-Easy python testing for [Python's unittest module](https://docs.python.org/3/library/unittest.html). Pyt's goal is to make running Python unit tests fun and easy.
+Pyt is a lightweight wrapper around [Python's unittest module](https://docs.python.org/3/library/unittest.html) that adds some nice features and enhancements over the stock `unittest` module.
 
 
-## pyt testrunner
+### Quickstart
 
-So here was my problem, I would work on big Python projects, and I would be adding a new python file to a module in this big project:
+Pyt overrides unittest's built-in pathfinding to be smarter and less verbose, so you can match tests using prefix matching which makes running a test like:
 
-    /project/foo/bar/che/baz/newmodule.py
+	$ python -m unittest tests.foo_test.BarTestCase.test_che
+	
+as simple as:
 
-I would be adding the `Happy` class with a `sad` method to `newmodule` and I would want to test it, so I would then have to add a test for it:
+	$ pyt foo.Bar.che
+	
+But it's even less verbose if you want it to be, pyt can reach into the modules and classes to do its matching, so you don't even need to specify the module and class if you don't want to:
 
-    /project/test/foo/bar/che/baz/newmodule_test.py
-
-Then to actually run my new test:
-
-    $ python -m unittest test.foo.bar.che.baz.newmodule_test.HappyTestCase.test_sad
-
-This annoyed me! I could never remember the syntax to run the test, I could never remember what I named the test case (let's see, was that `HappyTestCase` or `HappyTest`?), so I decided to take a bit of time and make my life easier, and `pyt` was born.
-
-With `pyt`, I just need to remember what I'm working on:
-
-    $ pyt Happy.sad
-
-and `pyt` will do the rest, it will check every test module it finds in the working directory and see if it has a `Happy` test case with a `test_sad` method. No more having to remember the unittest syntax, and no more typing long test paths. Hopefully, if tests are easy to run, I'll write more of them.
+	$ pyt che
 
 
-### More examples
-
-Continuing the above example
+#### More examples
 
 To run all the `Happy` tests:
 
@@ -46,9 +36,32 @@ To run every test `pyt` can find:
 
     $ pyt
 
-And the way I like to run all tests:
+And the way I like to run all tests in the current directory:
 
-    $ pyt -bd
+    $ pyt -vb
+    
+Which can also be written:
+
+	$ pyt --verbose --buffer
+
+
+### Flags
+
+To see everything pyt can do
+
+    $ pyt --help
+    
+#### --warnings
+
+This will convert warnings into errors.
+
+	$ pyt --warnings
+	
+#### --rerun
+
+If your last testrun had failing tests this will rerun only the tests that failed.
+
+	$pyt --rerun
 
 
 ### Things to be aware of
@@ -61,14 +74,7 @@ And the way I like to run all tests:
 
 `pyt` will consider `foo.bar` to be the module, `Baz` to be a class (because it starts with a capital letter), and `che` to be a method (since it comes after the class).
 
-Likewise, `pyt` uses unittest conventions, so a test module should end with `_test` (eg, `foo.bar_test`) and a TestCase class should end with either `Test` or `TestCase` (eg, `BazTest`), and test methods should start with `test_` (eg, `test_che`).
-
-
-#### See all flags
-
-To see everything pyt can do
-
-    $ pyt --help
+Likewise, `pyt` uses unittest conventions, so a test module should end with `_test` (eg, `foo.bar_test`) or start with test (eg, `test_foo.py`) and a TestCase class should extend `unittest.TestCase`, and test methods should start with `test_` (eg, `test_che`).
 
 
 #### Vague input can cause pyt to run more tests than you expect
@@ -110,16 +116,15 @@ Use `pip`:
 
 You can also get it directly from the repo:
 
-    $ pip install git+https://github.com/Jaymon/pyt#egg=pyt
+    $ pip install --upgrade git+https://github.com/Jaymon/pyt#egg=pyt
 
-If you install pyt using Python 3 it is called on the command line uses the `pyt3` command instead of a `pyt` command, so:
+If you install pyt using Python 3 it can also be invoked using the `pyt3` command:
 
     $ pyt3 --help
 
-While Python 2 installs both `pyt` and `pyt2` commands:
+Likewise, Python 2 installs a `pyt2` command:
 
     $ pyt2 --help
-    $ pyt --help
 
 
 ## Testing
