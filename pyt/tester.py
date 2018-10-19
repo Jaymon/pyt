@@ -191,18 +191,6 @@ class TestResult(BaseTestResult):
                     if r.member is oh[0]:
                         setattr(r.handler, r.member_name, oh[1])
 
-#                 if r.member is self._original_stdout:
-# #                     logger.debug("Capturing stdout logger: {}".format(
-# #                         r.name,
-# #                     ))
-#                     setattr(r.handler, r.member_name, self._stdout_buffer)
-# 
-#                 elif r.member is self._original_stderr:
-# #                     logger.debug("Capturing stderr logger: {}".format(
-# #                         r.name,
-# #                     ))
-#                     setattr(r.handler, r.member_name, self._stderr_buffer)
-
     def _restoreStdout(self):
         if self.buffer:
             for r in loghandler_members():
@@ -214,16 +202,7 @@ class TestResult(BaseTestResult):
                     if r.member is oh[1]:
                         setattr(r.handler, r.member_name, oh[0])
 
-
-#             for r in loghandler_members():
-#                 if r.member is self._stdout_buffer:
-#                     setattr(r.handler, r.member_name, self._original_stdout)
-# 
-#                 elif r.member is self._stderr_buffer:
-#                     setattr(r.handler, r.member_name, self._original_stderr)
-
         super(TestResult, self)._restoreStdout()
-
 
 
 class TestRunner(BaseTestRunner):
@@ -351,12 +330,6 @@ class TestProgram(BaseTestProgram):
 
     def _getMainArgParser(self, parent):
         parser = super(TestProgram, self)._getMainArgParser(parent)
-#         parser.add_argument(
-#             'tests',
-#             nargs='*',
-#             default=[""],
-#             help='a list of any number of test modules, classes and test methods.'
-#         )
 
         # python3 will trigger discovery if no tests are passed in, so we
         # override that functionality so we get routed to our path guesser
