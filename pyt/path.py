@@ -195,7 +195,10 @@ class PathFinder(object):
 
     def modules(self):
         """return modules that match module_name"""
-        # this is a hack because I couldn't get imp.load_source to work right
+
+        # since the module has to be importable we go ahead and put the
+        # basepath as the very first path to check as that should minimize
+        # namespace collisions, this is what unittest does also
         sys.path.insert(0, self.basedir)
         for p in self.paths():
             # http://stackoverflow.com/questions/67631/

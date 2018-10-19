@@ -124,6 +124,60 @@ class TestProgramTest(TestCase):
         self.assertNotEqual(r, r3)
         self.assertNotEqual(r2, r3)
 
+    def test_buffer_4(self):
+        m = TestModule(
+            "import logging",
+            "import sys",
+            "",
+            "#logging.basicConfig()",
+            "logger = logging.getLogger(__name__)",
+            "logger.setLevel(logging.DEBUG)",
+            "log_handler = logging.StreamHandler(stream=sys.stderr)",
+            "logger.addHandler(log_handler)",
+            "",
+            "class Buffer4(TestCase):",
+            "   def test_success_1(self):",
+            "       logger.info('*success stderr logger*')",
+            "       print('*success stdout*')",
+            "       print('*success stderr*', file=sys.stderr)",
+            "",
+            "   def test_success_2(self):",
+            "       pass",
+            "",
+            "   def test_failure(self):",
+            "       logger.info('*failure stderr logger*')",
+            "       print('*failure stdout*')",
+            "       print('*failure stderr*', file=sys.stderr)",
+            "       self.assertTrue(False)",
+            "",
+        )
+        s = m.client
+
+        r = m.run("Buffer4.success_1", verbosity=2, buffer=True)
+        self.assertEqual(1, r.result.testsRun)
+        self.assertEqual(0, len(r.result.failures))
+        self.assertEqual(0, len(r.result.errors))
+
+        r = s.run("--verbose --buffer Buffer4.success")
+        self.assertTrue("test_success_1 ({}.Buffer4)".format(m.name) in r)
+        self.assertTrue("test_success_2 ({}.Buffer4)".format(m.name) in r)
+
+        r = s.run("--verbose --buffer Buffer4.success_1")
+        self.assertTrue("test_success_1 ({}.Buffer4)".format(m.name) in r)
+        self.assertFalse("*success stdout*" in r)
+        self.assertFalse("*success stderr*" in r)
+        self.assertFalse("*success stderr logger*" in r)
+
+        r = s.run("--buffer Buffer4.success_1")
+        self.assertFalse("*success stdout*" in r)
+        self.assertFalse("*success stderr*" in r)
+        self.assertFalse("*success stderr logger*" in r)
+
+        r = s.run("--buffer Buffer4.failure", code=1)
+        self.assertTrue("*failure stdout*" in r)
+        self.assertTrue("*failure stderr*" in r)
+        self.assertTrue("*failure stderr logger*" in r)
+        self.assertTrue("Ran 1 test" in r)
 
     def test_multi_cli(self):
         m = TestModule({

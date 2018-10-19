@@ -16,10 +16,9 @@ for k in list(sys.modules.keys()):
     if k.startswith("pyt.") or k == "pyt":
         sys.modules["bak.{}".format(k)] = sys.modules.pop(k)
 
-from pyt import tester
 from pyt.compat import *
 from pyt.path import PathFinder, PathGuesser
-from pyt.tester import TestLoader, main
+from pyt.tester import TestLoader, main, TestProgram
 from pyt.environ import TestEnviron
 
 
@@ -32,8 +31,8 @@ testdata.basic_logging()
 #environ.debug = True
 
 
-class Client(ModuleCommand):
-    name = "pyt"
+# class Client(ModuleCommand):
+#     name = "pyt"
 #     @property
 #     def environ(self):
 #         environ = super(Client, self).environ
@@ -60,7 +59,7 @@ class TestModule(object):
 
     @property
     def client(self):
-        return Client(cwd=self.cwd)
+        return ModuleCommand("pyt", cwd=self.cwd)
 
     @property
     def loader(self):
@@ -154,9 +153,13 @@ class TestModule(object):
     def run(self, name="", **kwargs):
         if not name:
             name = self.name
-        r = main(
-            self.name,
-            self.cwd,
+
+        loader = self.loader # we pass in the loader so cwd will be set
+        r = TestProgram(
+            module=None,
+            argv=[self.__class__.__name__, name],
+            testLoader=loader,
+            exit=False,
             **kwargs
         )
         return r

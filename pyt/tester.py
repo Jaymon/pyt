@@ -18,7 +18,7 @@ import platform
 import warnings
 
 from .compat import *
-from .utils import testpath, classpath, chain
+from .utils import testpath, classpath, chain, loghandler_members
 from .environ import TestEnviron
 from .path import PathGuesser, PathFinder, RerunFile
 
@@ -175,6 +175,56 @@ class TestResult(BaseTestResult):
         super(TextTestResult, self).addUnexpectedSuccess(test)
         self.showAll = orig_show_all
 
+    def _setupStdout(self):
+        super(TestResult, self)._setupStdout()
+        if self.buffer:
+            # Now I realize why I had all that custom stdout/stderr handling
+            # code in the previous version, turns out by default buffer didn't
+            # remove logs when logging had already been messed with, so now I
+            # mess with the loggers and buffer them
+            for r in loghandler_members():
+                ohs = [
+                    (self._original_stdout, self._stdout_buffer),
+                    (self._original_stderr, self._stderr_buffer)
+                ]
+                for oh in ohs:
+                    if r.member is oh[0]:
+                        setattr(r.handler, r.member_name, oh[1])
+
+#                 if r.member is self._original_stdout:
+# #                     logger.debug("Capturing stdout logger: {}".format(
+# #                         r.name,
+# #                     ))
+#                     setattr(r.handler, r.member_name, self._stdout_buffer)
+# 
+#                 elif r.member is self._original_stderr:
+# #                     logger.debug("Capturing stderr logger: {}".format(
+# #                         r.name,
+# #                     ))
+#                     setattr(r.handler, r.member_name, self._stderr_buffer)
+
+    def _restoreStdout(self):
+        if self.buffer:
+            for r in loghandler_members():
+                ohs = [
+                    (self._original_stdout, self._stdout_buffer),
+                    (self._original_stderr, self._stderr_buffer)
+                ]
+                for oh in ohs:
+                    if r.member is oh[1]:
+                        setattr(r.handler, r.member_name, oh[0])
+
+
+#             for r in loghandler_members():
+#                 if r.member is self._stdout_buffer:
+#                     setattr(r.handler, r.member_name, self._original_stdout)
+# 
+#                 elif r.member is self._stderr_buffer:
+#                     setattr(r.handler, r.member_name, self._original_stderr)
+
+        super(TestResult, self)._restoreStdout()
+
+
 
 class TestRunner(BaseTestRunner):
     """
@@ -251,8 +301,7 @@ class TestProgram(BaseTestProgram):
             logger.setLevel(logging.DEBUG)
 
     def __init__(self, **kwargs):
-        tl = TestLoader()
-        kwargs.setdefault('testLoader', tl)
+        kwargs.setdefault('testLoader', TestLoader())
         kwargs.setdefault('testRunner', TestRunner)
         super(TestProgram, self).__init__(**kwargs)
 
