@@ -633,6 +633,7 @@ class TestProgramTest(TestCase):
 
 class TestLoaderTest(TestCase):
     def test_issue_30(self):
+        """https://github.com/Jaymon/pyt/issues/30"""
         m = TestModule({
             "issuethirty.model": [],
             "issuethirty_test.model_test": [
@@ -659,6 +660,7 @@ class TestLoaderTest(TestCase):
         #pf = PathFinder(basedir=dirpath.basedir)
 
     def test_issue_32(self):
+        """https://github.com/Jaymon/pyt/issues/32"""
         m = TestModule({
             "issuethirtytwo": [
                 "class Bar(object):",

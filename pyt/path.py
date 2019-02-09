@@ -475,7 +475,8 @@ class PathFinder(object):
         :returns: generator, same as os.walk
         """
         for root, dirs, files in os.walk(basedir, topdown=True):
-            dirs[:] = [d for d in dirs if d[0] != '.'] # ignore dot directories
+            # ignore dot directories and private directories (start with underscore)
+            dirs[:] = [d for d in dirs if d[0] != '.' and d[0] != "_"]
             yield root, dirs, files
 
     def paths(self):

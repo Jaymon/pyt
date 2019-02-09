@@ -79,6 +79,7 @@ class TestModule(object):
         )
         return tc
     tci = pathfinder
+    finder = pathfinder
 
     def __init__(self, *body, **kwargs):
         if "cwd" in kwargs:

@@ -8,6 +8,25 @@ from . import TestCase, TestModule
 
 
 class PathFinderTest(TestCase):
+    def test_issue_29(self):
+        """make sure private directories are ignored
+
+        https://github.com/Jaymon/pyt/issues/29"""
+        m = TestModule({
+            "issuetwentynine.__foo__.bar_test": [
+                "class BarTest(TestCase):",
+                "    def test_che(self): pass",
+            ],
+            "issuetwentynine_test._private.bar_test": [
+                "class BarTest(TestCase):",
+                "    def test_che(self): pass",
+            ],
+        }, name="")
+
+        pf = m.pathfinder
+        r = list(pf.paths())
+        self.assertEqual(1, len(r))
+
     def test__find_prefix_paths(self):
         modpath = testdata.create_module("find.prefix.paths.whew_test")
         pf = PathFinder(basedir=modpath.basedir)
