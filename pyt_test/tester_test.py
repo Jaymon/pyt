@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import unicode_literals, division, print_function, absolute_import
 import sys
 
 import testdata
 
+from pyt.compat import unicode
 from pyt.tester import TestProgram
 from pyt import __version__
 from . import TestCase, TestModule
@@ -631,6 +632,65 @@ class TestProgramTest(TestCase):
 
 
 class TestLoaderTest(TestCase):
+    def test_issue_30(self):
+        m = TestModule({
+            "issuethirty.model": [],
+            "issuethirty_test.model_test": [
+                "from unittest import TestCase",
+                "",
+                "class BarTest(TestCase):",
+                "    def test_che(self): pass",
+            ],
+        }, name="")
+
+        tl = m.loader
+        s = tl.loadTestsFromName("model.che")
+        self.assertEqual("issuethirty_test.model_test.BarTest.test_che", unicode(s))
+
+#         dirpath = testdata.create_modules({
+#             "issuethirty": [],
+#             "issuethirty_test.model_test": [
+#                 "from unittest import TestCase",
+#                 "",
+#                 "class BarTest(TestCase):",
+#                 "    def test_che(self): pass",
+#             ],
+#         })
+        #pf = PathFinder(basedir=dirpath.basedir)
+
+    def test_issue_32(self):
+        m = TestModule({
+            "issuethirtytwo": [
+                "class Bar(object):",
+                "    def che(self): pass",
+            ],
+            "issuethirtytwo_test": [
+                "from unittest import TestCase",
+                "",
+                "class BarTest(TestCase):",
+                "    def test_che(self): pass",
+            ],
+        }, name="")
+        tl = m.loader
+        s = tl.loadTestsFromName("issuethirtytwo.Bar.che")
+        self.assertEqual("issuethirtytwo_test.BarTest.test_che", unicode(s))
+
+        m = TestModule({
+            "issthirtytwotwo": [
+                "class Bar(object):",
+                "    def che(self): pass",
+            ],
+            "issthirtytwotwo_test.bar_test": [
+                "from unittest import TestCase",
+                "",
+                "class CheTest(TestCase):",
+                "    def test_baz(self): pass",
+            ],
+        }, name="")
+        tl = m.loader
+        s = tl.loadTestsFromName("issthirtytwotwo.bar.Che.baz")
+        self.assertEqual("issthirtytwotwo_test.bar_test.CheTest.test_baz", unicode(s))
+
     def test_private_testcase(self):
         # https://github.com/Jaymon/pyt/issues/17
         m = TestModule(

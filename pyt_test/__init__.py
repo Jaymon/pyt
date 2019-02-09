@@ -64,6 +64,7 @@ class TestModule(object):
     @property
     def loader(self):
         tl = TestLoader()
+        pout.v(self.cwd)
         tl._top_level_dir = self.cwd
         return tl
     tl = loader
@@ -85,8 +86,8 @@ class TestModule(object):
         else:
             self.cwd = testdata.create_dir()
 
-        name = kwargs.get('name', '')
-        if name:
+        name = kwargs.get('name', None)
+        if name is not None:
             self.name = name
 
         else:
@@ -95,10 +96,14 @@ class TestModule(object):
                 testdata.get_ascii(5).lower()
             )
 
-        bits = self.name.rsplit('.', 1)
-        self.module_name = bits[1] if len(bits) == 2 else bits[0]
-        self.prefix = bits[0] if len(bits) == 2 else ''
-        self.name_prefix = bits[1][:4] if len(bits) == 2 else bits[0][:4]
+        self.module_name = ""
+        self.prefix = ""
+        self.name_prefix = ""
+        if name:
+            bits = self.name.rsplit('.', 1)
+            self.module_name = bits[1] if len(bits) == 2 else bits[0]
+            self.prefix = bits[0] if len(bits) == 2 else ''
+            self.name_prefix = bits[1][:4] if len(bits) == 2 else bits[0][:4]
 
         if len(body) == 1: body = body[0]
         self.body = body

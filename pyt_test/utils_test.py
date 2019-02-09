@@ -8,7 +8,7 @@ from . import TestCase
 
 class UtilsTest(TestCase):
     def test_classpath(self):
-        s = "pyt_test.UtilsTest"
+        s = "pyt_test.utils_test.UtilsTest"
         r = classpath(self)
         self.assertEqual(s, r)
 
@@ -16,7 +16,7 @@ class UtilsTest(TestCase):
         self.assertEqual(s, r)
 
     def test_testpath(self):
-        self.skipTest()
+        self.skipTest("")
         tc = TestCase("test_foo")
         r = testpath(tc)
 

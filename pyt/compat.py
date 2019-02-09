@@ -12,6 +12,7 @@ if is_py2:
     from StringIO import StringIO
     from codecs import open
 
+    unicode = unicode
     basestring = basestring
     range = xrange # range is now always an iterator
 
@@ -29,6 +30,7 @@ elif is_py3:
     from io import StringIO
 
     basestring = (str, bytes)
+    unicode = str
 
     # ripped from six https://bitbucket.org/gutworth/six
     def reraise(tp, value, tb=None):
