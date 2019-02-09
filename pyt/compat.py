@@ -44,3 +44,7 @@ elif is_py3:
             value = None
             tb = None
 
+
+String = unicode if is_py2 else str
+Bytes = str if is_py2 else bytes
+

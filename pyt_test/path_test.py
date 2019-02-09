@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
+import os
 
 import testdata
 
-from pyt.path import PathFinder, PathGuesser, RerunFile
+from pyt.path import PathFinder, PathGuesser, RerunFile, SitePackagesDir
 from . import TestCase, TestModule
 
 
@@ -26,6 +27,25 @@ class PathFinderTest(TestCase):
         pf = m.pathfinder
         r = list(pf.paths())
         self.assertEqual(1, len(r))
+
+    def test_filter_system_dirs(self):
+        """if you have a virtual environment that isn't hidden or private that's
+        in the current directory then pyt will happily crawl all the way through
+        it looking for tests, I've put in some code to filter out the system dir
+        but this might not be enough and I will have to modify it"""
+        m = TestModule([
+            "class BarTest(TestCase):",
+            "    def test_che(self): pass",
+        ])
+
+        system_d = SitePackagesDir()
+        parent_d = os.path.dirname(system_d)
+        pf = m.pathfinder
+        r_system = list(pf.walk(system_d))
+        r_parent = list(pf.walk(m.cwd))
+        # if system directories weren't filtered there would be more directories
+        # in r_parent than r_system
+        self.assertLess(len(r_parent), len(r_system))
 
     def test__find_prefix_paths(self):
         modpath = testdata.create_module("find.prefix.paths.whew_test")
