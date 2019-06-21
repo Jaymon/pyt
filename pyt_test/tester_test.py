@@ -632,6 +632,34 @@ class TestProgramTest(TestCase):
 
 
 class TestLoaderTest(TestCase):
+    def test_load_tests_protocol(self):
+        """load tests protocol is supported by default in py>=3.2 but not in py2
+        https://docs.python.org/2/library/unittest.html#load-tests-protocol
+        https://docs.python.org/3/library/unittest.html#load-tests-protocol
+        """
+        m = TestModule(
+            "from unittest import TestCase, TestSuite",
+            "class BaseTest(TestCase):",
+            "    def test_che(self): pass",
+            "",
+            "def load_tests(*args, **kwargs):",
+            "    return TestSuite()",
+        )
+
+        tl = m.loader
+        s = tl.loadTestsFromName("")
+        self.assertFalse("test_che" in unicode(s))
+
+        m = TestModule(
+            "from unittest import TestCase",
+            "class BaseTest(TestCase):",
+            "    def test_che(self): pass",
+        )
+
+        tl = m.loader
+        s = tl.loadTestsFromName("")
+        self.assertTrue("test_che" in unicode(s))
+
     def test_issue_30(self):
         """https://github.com/Jaymon/pyt/issues/30"""
         m = TestModule({

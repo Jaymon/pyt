@@ -16,7 +16,10 @@ def testpath(test, method_name=""):
     :returns: string, the full testpath
     """
     if not method_name:
-        method_name = test._testMethodName
+        try:
+            method_name = test._testMethodName
+        except AttributeError:
+            pass
 
     return "{}.{}".format(classpath(test), method_name)
 

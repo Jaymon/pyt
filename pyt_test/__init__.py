@@ -15,6 +15,12 @@ from testdata import TestCase
 for k in list(sys.modules.keys()):
     if k.startswith("pyt.") or k == "pyt":
         sys.modules["bak.{}".format(k)] = sys.modules.pop(k)
+for n, l in list(logging.Logger.manager.loggerDict.items()):
+    if n.startswith("pyt.") or n == "pyt":
+        new_n = "bak.{}".format(n)
+        l.name = new_n
+        logging.Logger.manager.loggerDict[new_n] = logging.Logger.manager.loggerDict.pop(n)
+
 
 from pyt.compat import *
 from pyt.path import PathFinder, PathGuesser
@@ -22,34 +28,11 @@ from pyt.tester import TestLoader, main, TestProgram
 from pyt.environ import TestEnviron
 
 
-#echo.DEBUG = True
 testdata.basic_logging()
+# we have to modify logger to make sure it actually prints debug because pyt can
+# modify it
 #logger = logging.getLogger("pyt")
 #logger.setLevel(logging.DEBUG)
-
-#environ = tester.TestEnviron.get_instance()
-#environ.debug = True
-
-
-# class Client(ModuleCommand):
-#     name = "pyt"
-#     @property
-#     def environ(self):
-#         environ = super(Client, self).environ
-#         if os.getcwd() not in environ["PYTHONPATH"]:
-#             environ["PYTHONPATH"] = os.getcwd() + os.pathsep + environ["PYTHONPATH"]
-#         return environ
-
-#     def __init__(self, cwd):
-#         super(Client, self).__init__("pyt", cwd=cwd)
-
-#     def create_cmd(self, arg_str):
-#         prefix_arg_str = '--basedir="{}"'.format(self.cwd)
-#         if arg_str:
-#             arg_str = prefix_arg_str + " " + arg_str
-#         else:
-#             arg_str = prefix_arg_str
-#         return super(Client, self).create_cmd(arg_str)
 
 
 class TestModule(object):
@@ -64,7 +47,6 @@ class TestModule(object):
     @property
     def loader(self):
         tl = TestLoader()
-        pout.v(self.cwd)
         tl._top_level_dir = self.cwd
         return tl
     tl = loader
@@ -100,7 +82,7 @@ class TestModule(object):
         self.module_name = ""
         self.prefix = ""
         self.name_prefix = ""
-        if name:
+        if self.name:
             bits = self.name.rsplit('.', 1)
             self.module_name = bits[1] if len(bits) == 2 else bits[0]
             self.prefix = bits[0] if len(bits) == 2 else ''

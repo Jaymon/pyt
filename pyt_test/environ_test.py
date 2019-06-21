@@ -70,7 +70,7 @@ class EnvironTest(TestCase):
         self.assertTrue("Ran 2 tests" in r)
 
         # running modules
-        r = c.run('--verbose {}'.format(m.name), ret_code=1)
+        r = c.run('--verbose {}'.format(m.name), ret_code=0)
         self.assertTrue("skipped=3" in r)
 
         # running one test

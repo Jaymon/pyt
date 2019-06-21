@@ -413,8 +413,6 @@ class PathFinder(object):
                     ret = os.path.join(root, basename)
                     break
 
-
-
                 for basename in files:
                     fileroot = os.path.splitext(basename)[0]
                     if fileroot in modname or modname in fileroot:
@@ -484,6 +482,9 @@ class PathFinder(object):
 
             if filter_system_d:
                 dirs[:] = [d for d in dirs if not d.startswith(system_d)]
+
+            # filter out .pyc files
+            files[:] = [f for f in files if not f.lower().endswith(".pyc")]
 
             yield root, dirs, files
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
 import os
+import inspect
 
 import testdata
 
@@ -9,6 +10,21 @@ from . import TestCase, TestModule
 
 
 class PathFinderTest(TestCase):
+    def test_pyc_issues(self):
+        """https://github.com/Jaymon/pyt/issues/34"""
+        m = TestModule(
+            "from unittest import TestCase",
+            "class FooTest(TestCase):",
+            "    def test_bar(self): pass",
+        )
+
+        pyc_f = testdata.create_file("{}.pyc".format(m.module.name), "", tmpdir=m.module.parent.directory)
+
+        tl = m.loader
+        s = tl.loadTestsFromName("{}.Foo".format(m.module_name))
+        self.assertEqual(1, len(s._tests[0]._tests))
+        self.assertTrue(inspect.getsourcefile(s._tests[0]._tests[0].__class__).endswith(".py"))
+
     def test_issue_29(self):
         """make sure private directories are ignored
 

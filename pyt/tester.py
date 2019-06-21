@@ -310,7 +310,6 @@ class TestProgram(BaseTestProgram):
         if len(test_names) == 1 and not test_names[0]:
             if self.rerun:
                 self.testNames = list(RerunFile())
-                pout.v(self.testNames)
 
         super(TestProgram, self).createTests(*args, **kwargs)
 
