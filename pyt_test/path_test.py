@@ -10,6 +10,28 @@ from . import TestCase, TestModule
 
 
 class PathFinderTest(TestCase):
+    def test_issue_33(self):
+        """https://github.com/Jaymon/pyt/issues/33"""
+        m = TestModule({
+            "foo.__init__": [
+                "class Bar(object): pass",
+            ],
+            "foo_test": [
+                "from unittest import TestCase",
+                "class BarTest(TestCase):",
+                "    def test_che(self): pass",
+            ]
+        }, name="")
+
+        pf = m.pathfinder
+        r = pf._find_module_path(m.basedir, "foo")
+        self.assertTrue(r.endswith("foo_test.py"))
+
+#         pout.v(m.path)
+#         tl = m.loader
+#         s = tl.loadTestsFromName("foo.Bar.che".format(m.module_name))
+#         pout.v(s)
+
     def test_pyc_issues(self):
         """https://github.com/Jaymon/pyt/issues/34"""
         m = TestModule(

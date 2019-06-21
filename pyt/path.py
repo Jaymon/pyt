@@ -8,6 +8,7 @@ import inspect
 import importlib
 import logging
 import hashlib
+import site
 
 from .compat import *
 from .utils import modname
@@ -361,6 +362,8 @@ class PathFinder(object):
         return ret
 
     def _find_prefix_paths(self, basedir, prefix):
+        """the prefix is what comes before the module name (prefix.module_name) so this
+        will only find prefixes, not modules"""
         ret = basedir
         modnames = re.split(r"[\.\/]", prefix)
         seen_paths = set()
@@ -400,10 +403,67 @@ class PathFinder(object):
         return ret
 
     def _find_module_path(self, basedir, modname):
+        """find a module matching modname in basedir and return the path to that module
+
+        :param basedir: string, the base directory to look for the module in
+        :param modname: string, the module name
+        :returns: string, the full path to the found module, empty if nothing found
+        """
+        ret = ""
+
+        logger.debug('Checking for a module that matches {} in {}'.format(modname, basedir))
+        for root, dirs, files in self.walk(basedir):
+            basename = self._find_basename(modname, files, is_prefix=False)
+            if basename:
+                ret = os.path.join(root, basename)
+                break
+
+            for basename in files:
+                fileroot = os.path.splitext(basename)[0]
+                if fileroot in modname or modname in fileroot:
+                    for pf in self.module_postfixes:
+                        n = modname + pf
+                        logger.debug('Checking {} against {}'.format(n, fileroot))
+                        if fileroot.startswith(n):
+                            ret = os.path.join(root, basename)
+                            break
+
+                    if not ret:
+                        for pf in self.module_prefixes:
+                            n = pf + modname
+                            logger.debug('Checking {} against {}'.format(n, fileroot))
+                            if fileroot.startswith(n):
+                                ret = os.path.join(root, basename)
+                                break
+
+                    if not ret:
+                        if self._is_module_path(basename) and modname == basename:
+                            ret = os.path.join(root, basename)
+                            break
+
+                if ret: break
+            if ret: break
+
+        if not ret:
+            ret = self._find_prefix_path(basedir, modname)
+            if not ret:
+                raise IOError("Could not find a module path with {}".format(modname))
+
+        logger.debug("Found module path {}".format(ret))
+        return ret
+
+    def DISABLED_find_module_path(self, basedir, modname):
+        """find a module matching modname in basedir and return the path to that module
+
+        :param basedir: string, the base directory to look for the module in
+        :param modname: string, the module name
+        :returns: string, the full path to the found module, empty if nothing found
+        """
         ret = ""
 
         try:
             ret = self._find_prefix_path(basedir, modname)
+            pout.v(ret)
 
         except IOError:
             logger.debug('Checking for a module that matches {} in {}'.format(modname, basedir))
@@ -593,59 +653,62 @@ class PathFinder(object):
 
 
 # !!! Ripped from pout.path
-import site
 class SitePackagesDir(String):
     """Finds the site-packages directory and sets the value of this string to that
     path"""
+    _basepath = ""
     def __new__(cls):
-        basepath = ""
-        try:
-            paths = site.getsitepackages()
-            basepath = paths[0] 
-            logger.debug(
-                "Found site-packages directory {} using site.getsitepackages".format(
-                    basepath
-                )
-            )
-
-        except AttributeError:
-            # we are probably running this in a virtualenv, so let's try a different
-            # approach
-            # try and brute-force discover it since it's not defined where it
-            # should be defined
-            sitepath = os.path.join(os.path.dirname(site.__file__), "site-packages")
-            if os.path.isdir(sitepath):
-                basepath = sitepath
+        basepath = cls._basepath
+        if not basepath:
+            try:
+                paths = site.getsitepackages()
+                basepath = paths[0] 
                 logger.debug(
-                    "Found site-packages directory {} using site.__file__".format(
+                    "Found site-packages directory {} using site.getsitepackages".format(
                         basepath
                     )
                 )
 
-            else:
-                for path in sys.path:
-                    if path.endswith("site-packages"):
-                        basepath = path
-                        logger.debug(
-                            "Found site-packages directory {} using sys.path".format(
-                                basepath
-                            )
+            except AttributeError:
+                # we are probably running this in a virtualenv, so let's try a different
+                # approach
+                # try and brute-force discover it since it's not defined where it
+                # should be defined
+                sitepath = os.path.join(os.path.dirname(site.__file__), "site-packages")
+                if os.path.isdir(sitepath):
+                    basepath = sitepath
+                    logger.debug(
+                        "Found site-packages directory {} using site.__file__".format(
+                            basepath
                         )
-                        break
+                    )
 
-                if not basepath:
+                else:
                     for path in sys.path:
-                        if path.endswith("dist-packages"):
+                        if path.endswith("site-packages"):
                             basepath = path
                             logger.debug(
-                                "Found dist-packages directory {} using sys.path".format(
+                                "Found site-packages directory {} using sys.path".format(
                                     basepath
                                 )
                             )
                             break
 
+                    if not basepath:
+                        for path in sys.path:
+                            if path.endswith("dist-packages"):
+                                basepath = path
+                                logger.debug(
+                                    "Found dist-packages directory {} using sys.path".format(
+                                        basepath
+                                    )
+                                )
+                                break
+
         if not basepath:
             raise IOError("Could not find site-packages directory")
+
+        cls._basepath = basepath
 
         return super(SitePackagesDir, cls).__new__(cls, basepath)
 

@@ -76,8 +76,7 @@ class TestLoader(BaseTestLoader):
         found = False
         logger.debug("Searching for tests in directory: {}".format(ti.basedir))
         for i, tc in enumerate(ti.possible, 1):
-            logger.debug("{}. Searching for tests matching:".format(i))
-            logger.debug("    {}".format(tc))
+            logger.debug("{}. Searching for tests matching: {}".format(i, tc))
             if tc.has_method():
                 for c, mn in tc.method_names():
                     logger.debug('Found method test: {}'.format(testpath(c, mn)))
