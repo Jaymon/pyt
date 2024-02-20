@@ -127,14 +127,6 @@ class TestLoader(BaseTestLoader):
         logger.debug("Found {} total tests".format(ts.countTestCases()))
         return ts
 
-#     def loadTestsFromNames(self, names, *args, **kwargs):
-#         ts = self.suiteClass()
-#         for name in names:
-#             name_suite = self.loadTestsFromName(name, *args, **kwargs)
-#             ts.addTest(name_suite)
-# 
-#         return ts
-
 
 class TestResult(BaseTestResult):
     """
@@ -309,17 +301,6 @@ class TestProgram(BaseTestProgram):
         kwargs.setdefault('testRunner', TestRunner)
         super().__init__(**kwargs)
 
-#     def parseArgs(self, argv):
-#         #pout.v(argv)
-#         ret = super().parseArgs(argv)
-# 
-#         # after parent's parseArgs is ran self.testNames should be set and
-#         # should contain all the passed in patterns pyt can use to find the
-#         # tests, but parseArgs() also calls createTests() which uses that
-#         # information so by the time we get to right here all tests have been
-#         # created
-#         #pout.v(self.testNames, self)
-
     def createTests(self, *args, **kwargs):
         # if we didn't pass in any test names then we want to find all tests
         test_names = getattr(self, "testNames", [])
@@ -332,9 +313,6 @@ class TestProgram(BaseTestProgram):
         # we want to keep open the possibility of grabbing values from this
         # later on down the line
         self.test.main = self
-
-#     def _print_help(self):
-#         super()._print_help()
 
     def _getMainArgParser(self, parent):
         parser = super()._getMainArgParser(parent)
