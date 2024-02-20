@@ -118,22 +118,14 @@ You can also get it directly from the repo:
 
     $ pip install --upgrade git+https://github.com/Jaymon/pyt#egg=pyt
 
-If you install pyt using Python 3 it can also be invoked using the `pyt3` command:
-
-    $ pyt3 --help
-
-Likewise, Python 2 installs a `pyt2` command:
-
-    $ pyt2 --help
-
 
 ## Testing
 
-Testing in 2.7 on most systems:
-
-    $ python -m unittest pyt_test
-
 Testing in 3.5 on MacOS:
 
-    $ python3.5 -m unittest pyt_test
+    $ python3.10 -m unittest pyt_test
+
+Or, if you're really brave, you can use `pyt` to test itself:
+
+    $ python -m pyt tests -df
 
