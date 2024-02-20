@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
 from unittest import TestCase # to allow from pyt import TestCase
 from unittest import ( # so pyt can be a one-stop shop for skipping
     SkipTest,
@@ -41,7 +40,8 @@ def get_counts():
 
 
 def is_single_class():
-    """Returns True if only a single class is being run or some tests within a single class"""
+    """Returns True if only a single class is being run or some tests within a
+    single class"""
     ret = False
     counts = get_counts()
     if counts["classes"] < 1 and counts["modules"] < 1:

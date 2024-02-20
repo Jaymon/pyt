@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
 import os
 import sys
 import logging
@@ -29,10 +28,6 @@ from pyt.environ import TestEnviron
 
 
 testdata.basic_logging()
-# we have to modify logger to make sure it actually prints debug because pyt can
-# modify it
-#logger = logging.getLogger("pyt")
-#logger.setLevel(logging.DEBUG)
 
 
 class TestModule(object):
@@ -66,6 +61,7 @@ class TestModule(object):
     def __init__(self, *body, **kwargs):
         if "cwd" in kwargs:
             self.cwd = kwargs["cwd"]
+
         else:
             self.cwd = testdata.create_dir()
 
@@ -93,44 +89,40 @@ class TestModule(object):
         if isinstance(self.body, dict):
             for k in self.body:
                 self.body[k] = self._prepare_body(self.body[k])
+
             self.modules = testdata.create_modules(
                 self.body,
-                self.cwd,
-                prefix=self.name,
+                modpath=self.name,
+                tmpdir=self.cwd,
             )
             self.path = self.modules.path
 
         else:
             if kwargs.get("package", False):
                 self.module = testdata.create_package(
-                    self.name,
                     self._prepare_body(self.body),
-                    self.cwd
+                    modpath=self.name,
+                    tmpdir=self.cwd
                 )
+
             else:
                 self.module = testdata.create_module(
-                    self.name,
                     self._prepare_body(self.body),
-                    self.cwd
+                    modpath=self.name,
+                    tmpdir=self.cwd
                 )
 
             self.path = self.module.path
 
-
     def _prepare_body(self, body):
         if isinstance(body, basestring):
             body = list(body.splitlines(False))
+
         else:
             body = list(body)
 
         ret = [
             "# -*- coding: utf-8 -*-",
-            "from __future__ import (",
-            "    unicode_literals,",
-            "    division,",
-            "    print_function,",
-            "    absolute_import",
-            ")",
             "from unittest import TestCase",
             "import pyt",
         ]

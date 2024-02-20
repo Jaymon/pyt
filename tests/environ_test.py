@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
-
 
 from pyt.environ import TestEnviron
 from . import TestCase, TestModule
@@ -26,13 +24,9 @@ class EnvironTest(TestCase):
         )
         s = m.client
 
-        with self.assertRaises(RuntimeError):
-            s.run('--verbose Bar')
-
-        with self.assertRaises(RuntimeError):
-            s.run('--verbose Foo')
-
-        r = s.run('--verbose {}'.format(m.name_prefix))
+        s.run(["--verbose", "Bar"], code=1)
+        s.run(["--verbose", "Foo"], code=1)
+        s.run(["--verbose", m.name_prefix])
 
     def test_environ_2(self):
         m = TestModule({
@@ -64,23 +58,23 @@ class EnvironTest(TestCase):
         c = m.client
 
         # running one class
-        r = c.run('--verbose bar.Bar')
+        r = c.run(["--verbose", "bar.Bar"])
         self.assertTrue("test_one ({}.bar_test.BarTest)".format(m.name) in r)
         self.assertTrue("test_two ({}.bar_test.BarTest)".format(m.name) in r)
         self.assertTrue("Ran 2 tests" in r)
 
         # running modules
-        r = c.run('--verbose {}'.format(m.name), ret_code=0)
+        r = c.run(["--verbose", m.name], ret_code=0)
         self.assertTrue("skipped=3" in r)
 
         # running one test
         #r = c.run('bar.Bar.one --debug', code=1)
         #self.assertTrue("skipped=1" in r)
-        r = c.run('--verbose bar.Bar.one')
+        r = c.run(["--verbose", "bar.Bar.one"])
         self.assertTrue("Ran 1 test" in r)
 
         # running one module
-        r = c.run('--verbose bar')
+        r = c.run(["--verbose", "bar"])
         self.assertTrue("test_one ({}.bar_test.BarTest)".format(m.name) in r)
         self.assertTrue("test_two ({}.bar_test.BarTest)".format(m.name) in r)
         self.assertTrue("Ran 2 tests" in r)

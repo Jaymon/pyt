@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
 import sys
 
 import testdata
@@ -38,7 +37,7 @@ class TestProgramTest(TestCase):
             "    def test_bar(self): pass",
         )
 
-        r = m.client.run("MultiRun.foo MultiRun.bar")
+        r = m.client.run(["MultiRun.foo", "MultiRun.bar"])
         self.assertTrue("Ran 2 tests" in r)
 
     def test_blank_run(self):
@@ -69,16 +68,16 @@ class TestProgramTest(TestCase):
         )
         s = m.client
 
-        r = s.run("--buffer pmod")
+        r = s.run(["--buffer", "pmod"])
         self.assertFalse("in bar test" in r)
 
         r = s.run("pmod.Bar.bar")
         self.assertTrue("in bar test" in r)
 
-        r = s.run("--buffer pmod.Bar.bar")
+        r = s.run(["--buffer", "pmod.Bar.bar"])
         self.assertFalse("in bar test" in r)
 
-        r = s.run("--buffer pmod.Bar")
+        r = s.run(["--buffer", "pmod.Bar"])
         self.assertFalse("in bar test" in r)
 
         r = s.run("pmod.Bar")
@@ -92,7 +91,7 @@ class TestProgramTest(TestCase):
             "        print('{}')".format(buffered_s),
         )
 
-        r = m.client.run("--verbose Buffer.bar")
+        r = m.client.run(["--verbos", "Buffer.bar"])
         self.assertTrue(buffered_s in r)
         self.assertTrue("Guessing test name:" in r)
 
@@ -100,12 +99,11 @@ class TestProgramTest(TestCase):
         self.assertFalse("Guessing test name:" in r)
         self.assertTrue(buffered_s in r)
 
-        pout.b()
-        r = m.client.run("--buffer Buffer.bar")
+        r = m.client.run(["--buffer", "Buffer.bar"])
         self.assertFalse("Guessing test name:" in r)
         self.assertFalse(buffered_s in r)
 
-        r = m.client.run("--buffer --verbose Buffer.bar")
+        r = m.client.run(["--buffer", "--verbose", "Buffer.bar"])
         self.assertTrue("Guessing test name:" in r)
         self.assertFalse(buffered_s in r)
 
@@ -118,9 +116,9 @@ class TestProgramTest(TestCase):
         )
         s = m.client
 
-        r = s.run('--buffer --verbose {}'.format(m.name))
-        r2 = s.run('--verbose {}'.format(m.name))
-        r3 = s.run('--buffer {}'.format(m.name))
+        r = s.run(["--buffer", "--verbose", m.name])
+        r2 = s.run(["--verbose", m.name])
+        r3 = s.run(["--buffer", m.name])
         self.assertNotEqual(r, r2)
         self.assertNotEqual(r, r3)
         self.assertNotEqual(r2, r3)
@@ -159,22 +157,22 @@ class TestProgramTest(TestCase):
         self.assertEqual(0, len(r.result.failures))
         self.assertEqual(0, len(r.result.errors))
 
-        r = s.run("--verbose --buffer Buffer4.success")
+        r = s.run(["--verbose", "--buffer", "Buffer4.success"])
         self.assertTrue("test_success_1 ({}.Buffer4)".format(m.name) in r)
         self.assertTrue("test_success_2 ({}.Buffer4)".format(m.name) in r)
 
-        r = s.run("--verbose --buffer Buffer4.success_1")
+        r = s.run(["--verbose", "--buffer", "Buffer4.success_1"])
         self.assertTrue("test_success_1 ({}.Buffer4)".format(m.name) in r)
         self.assertFalse("*success stdout*" in r)
         self.assertFalse("*success stderr*" in r)
         self.assertFalse("*success stderr logger*" in r)
 
-        r = s.run("--buffer Buffer4.success_1")
+        r = s.run(["--buffer", "Buffer4.success_1"])
         self.assertFalse("*success stdout*" in r)
         self.assertFalse("*success stderr*" in r)
         self.assertFalse("*success stderr logger*" in r)
 
-        r = s.run("--buffer Buffer4.failure", code=1)
+        r = s.run(["--buffer", "Buffer4.failure"], code=1)
         self.assertTrue("*failure stdout*" in r)
         self.assertTrue("*failure stderr*" in r)
         self.assertTrue("*failure stderr logger*" in r)
@@ -196,7 +194,7 @@ class TestProgramTest(TestCase):
             ],
         })
 
-        r = m.client.run("multicli.One.one climulti.Two.two")
+        r = m.client.run(["multicli.One.one", "climulti.Two.two"])
         self.assertTrue("Ran 2 tests" in r)
 
     def test_multiple(self):
@@ -213,7 +211,7 @@ class TestProgramTest(TestCase):
         })
 
         s = m.client
-        r = s.run("--verbose bar che")
+        r = s.run(["--verbose", "bar", "che"])
         self.assertTrue("bar_test" in r)
         self.assertTrue("che_test" in r)
         self.assertEqual(2, r.count("Found 1 total tests"))
@@ -243,7 +241,7 @@ class TestProgramTest(TestCase):
         self.assertTrue("Ran 2 tests" in r)
 
         # running it again will test for the pyc problem
-        r = s.run("--verbose dc_test")
+        r = s.run(["--verbose", "dc_test"])
         self.assertFalse("No module named pyc" in r)
 
         r = s.run("--verbose")
@@ -258,10 +256,10 @@ class TestProgramTest(TestCase):
         ])
         s = m.client
 
-        r = s.run("--verbose {}:Bah".format(m.path))
+        r = s.run(["--verbose", "{}:Bah".format(m.path)])
         self.assertTrue("Ran 0 tests" in r)
 
-        r = s.run("--verbose {}".format(m.path))
+        r = s.run(["--verbose", m.path])
         self.assertTrue("Ran 1 test" in r)
 
         r = s.run("{}:Foo".format(m.path))
@@ -279,7 +277,7 @@ class TestProgramTest(TestCase):
         ], package=True)
 
         s = m.client
-        r = s.run("--verbose {}".format(m.name))
+        r = s.run(["--verbose", m.name])
         self.assertTrue("in foo test" in r)
 
     def test_skip_tests(self):
@@ -293,7 +291,7 @@ class TestProgramTest(TestCase):
             "    def test_bar(self): pass",
         )
         c = m.client
-        r = c.run('--verbose SkipT.bar')
+        r = c.run(["--verbose", "SkipT.bar"])
         self.assertTrue("Ran 1 test" in r)
 
     def test_parse_error_1(self):
@@ -309,8 +307,7 @@ class TestProgramTest(TestCase):
         })
         s = m.client
 
-        with self.assertRaises(RuntimeError):
-            ret_code = s.run('PEFoo.bar')
+        ret_code = s.run('PEFoo.bar', code=1)
 
     def test_parse_error_2(self):
         m = TestModule(
@@ -320,8 +317,7 @@ class TestProgramTest(TestCase):
         )
         s = m.client
 
-        with self.assertRaises(RuntimeError):
-            r = s.run(m.name)
+        r = s.run(m.name, code=1)
 
     def test_testcase_not_found(self):
         """ https://github.com/Jaymon/pyt/issues/1 """
@@ -332,7 +328,7 @@ class TestProgramTest(TestCase):
         )
         s = m.client
 
-        r = s.run('--verbose {}.BARTest.test_che'.format(m.name))
+        r = s.run(["--verbose", "{}.BARTest.test_che".format(m.name)])
         self.assertTrue('test_che ({}.BARTest)'.format(m.name) in r)
 
     def test_error_print_on_failure(self):
@@ -343,7 +339,7 @@ class TestProgramTest(TestCase):
         )
         s = m.client
 
-        r = s.run('', code=1)
+        r = s.run("", code=1)
         self.assertTrue(len(r) > 0)
 
     def test_failfast_1(self):
@@ -412,7 +408,7 @@ class TestProgramTest(TestCase):
         })
         s = m.client
 
-        r = s.run("cli_errors.")
+        r = s.run("cli_errors.", code=1)
         self.assertTrue("Ran 1 test" in r)
 
         # if there is an error and no other test is found, bubble up the error
@@ -422,9 +418,7 @@ class TestProgramTest(TestCase):
             "raise ValueError('foo')"
         )
         s = m.client
-
-        with self.assertRaises(RuntimeError):
-            s.run(m.name_prefix)
+        s.run(m.name_prefix, code=1)
 
     def test_cli_run(self):
         m = TestModule(
@@ -434,10 +428,10 @@ class TestProgramTest(TestCase):
         )
         s = m.client
 
-        r = s.run('--verbose {}'.format(m.name_prefix))
+        r = s.run(["--verbose", m.name_prefix])
         self.assertTrue("Ran 1 test")
 
-        r = s.run('--verbose blah.blarg.blorg')
+        r = s.run(["--verbose", "blah.blarg.blorg"])
         self.assertTrue("Ran 0 tests")
 
     def test_found_module_ignore_method(self):
@@ -448,7 +442,7 @@ class TestProgramTest(TestCase):
         )
         s = m.client
 
-        r = s.run('--verbose foo')
+        r = s.run(["--verbose", "foo"])
         self.assertTrue('Found method test: {}'.format(m.name) in r)
 
     def test_ignore_non_test_modules(self):
@@ -464,7 +458,7 @@ class TestProgramTest(TestCase):
         })
         s = m.client
 
-        r = s.run('--verbose tint')
+        r = s.run(["--verbose", "tint"])
         self.assertEqual(1, r.count('Found module test'))
 
     def test_prefix_search_1(self):
@@ -482,29 +476,29 @@ class TestProgramTest(TestCase):
         )
         s = m.client
 
-        r = s.run('--verbose {}.*Bar'.format(m.name))
+        r = s.run(["--verbose", "{}.*Bar".format(m.name)])
         self.assertTrue("Ran 3 tests" in r)
 
-        r = s.run('--verbose Bar.*handshake')
+        r = s.run(["--verbose", "Bar.*handshake"])
         self.assertTrue('test_bad_accept_handshake' in r)
         self.assertTrue('test_handshake' in r)
 
-        r = s.run('--verbose test_handshake')
+        r = s.run(["--verbose", "test_handshake"])
         self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
 
-        r = s.run('--verbose Bar.test_handshake')
+        r = s.run(["--verbose", "Bar.test_handshake"])
         self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
 
-        r = s.run('--verbose che')
+        r = s.run(["--verbose", "che"])
         self.assertTrue('Found module test: prefix_search.chebaz_test' in r)
 
-        r = s.run('--verbose baz')
+        r = s.run(["--verbose", "baz"])
         self.assertTrue('Ran 0 tests' in r)
 
-        r = s.run('Bar.handshake --debug')
+        r = s.run(["Bar.handshake", "--debug"])
         self.assertTrue('bad_accept_handshake' not in r)
 
-        r = s.run('Bar --debug')
+        r = s.run(["Bar", "--debug"])
         self.assertTrue('FooBarTest' not in r)
 
     def test_prefix_search_2(self):
@@ -533,7 +527,7 @@ class TestProgramTest(TestCase):
         )
         s = m.client
 
-        r = s.run("--verbose {}".format(m.name_prefix))
+        r = s.run(["--verbose", m.name_prefix])
         self.assertTrue("Ran 2 tests" in r)
 
     def test_setup(self):
@@ -604,7 +598,7 @@ class TestProgramTest(TestCase):
         ])
         s = m.client
 
-        r = s.run("Names2.1name Names2.2name")
+        r = s.run(["Names2.1name", "Names2.2name"])
         self.assertTrue("test 1" in r)
         self.assertTrue("test 2" in r)
         self.assertTrue("Ran 2 tests")
@@ -627,7 +621,28 @@ class TestProgramTest(TestCase):
         r = c.run(m.name)
         self.assertTrue("this warning should be an error" in r)
 
-        r = c.run("{} --warnings".format(m.name), code=1)
+        r = c.run([m.name, "--warnings"], code=1)
+        self.assertTrue("errors=1" in r)
+
+    def test_import_error(self):
+        m = TestModule({
+            "success_test": [
+                "class OneTest(TestCase):",
+                "    def test_one(self):",
+                "        pass",
+                "",
+            ],
+            "failure_test": [
+                "raise ImportError()",
+            ],
+        })
+
+        r = m.client.run(retcode=1)
+        self.assertTrue("Ran 1 test" in r)
+        self.assertTrue("errors=1" in r)
+
+        r = m.client.run("-f", retcode=1)
+        self.assertTrue("Ran 0 tests" in r)
         self.assertTrue("errors=1" in r)
 
 
@@ -675,17 +690,6 @@ class TestLoaderTest(TestCase):
         tl = m.loader
         s = tl.loadTestsFromName("model.che")
         self.assertEqual("issuethirty_test.model_test.BarTest.test_che", unicode(s))
-
-#         dirpath = testdata.create_modules({
-#             "issuethirty": [],
-#             "issuethirty_test.model_test": [
-#                 "from unittest import TestCase",
-#                 "",
-#                 "class BarTest(TestCase):",
-#                 "    def test_che(self): pass",
-#             ],
-#         })
-        #pf = PathFinder(basedir=dirpath.basedir)
 
     def test_issue_32(self):
         """https://github.com/Jaymon/pyt/issues/32"""
@@ -764,7 +768,6 @@ class TestLoaderTest(TestCase):
         tl = m.loader
 
         s = tl.loadTestsFromName("packagefoo")
-        pout.v(str(s))
         self.assertTrue('BarTest' in str(s))
         self.assertTrue('CheTest' in str(s))
 

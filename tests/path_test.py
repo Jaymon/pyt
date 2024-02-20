@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
 import os
 import inspect
 
@@ -27,11 +26,6 @@ class PathFinderTest(TestCase):
         r = pf._find_module_path(m.basedir, "foo")
         self.assertTrue(r.endswith("foo_test.py"))
 
-#         pout.v(m.path)
-#         tl = m.loader
-#         s = tl.loadTestsFromName("foo.Bar.che".format(m.module_name))
-#         pout.v(s)
-
     def test_pyc_issues(self):
         """https://github.com/Jaymon/pyt/issues/34"""
         m = TestModule(
@@ -40,12 +34,20 @@ class PathFinderTest(TestCase):
             "    def test_bar(self): pass",
         )
 
-        pyc_f = testdata.create_file("{}.pyc".format(m.module.name), "", tmpdir=m.module.parent.directory)
+        pyc_f = testdata.create_file(
+            "", 
+            "{}.pyc".format(m.module.name),
+            tmpdir=m.module.parent.directory
+        )
 
         tl = m.loader
         s = tl.loadTestsFromName("{}.Foo".format(m.module_name))
         self.assertEqual(1, len(s._tests[0]._tests))
-        self.assertTrue(inspect.getsourcefile(s._tests[0]._tests[0].__class__).endswith(".py"))
+        self.assertTrue(
+            inspect.getsourcefile(
+                s._tests[0]._tests[0].__class__
+            ).endswith(".py")
+        )
 
     def test_issue_29(self):
         """make sure private directories are ignored
@@ -86,15 +88,21 @@ class PathFinderTest(TestCase):
         self.assertLess(len(r_parent), len(r_system))
 
     def test__find_prefix_paths(self):
-        modpath = testdata.create_module("find.prefix.paths.whew_test")
+        modpath = testdata.create_module(modpath="find.prefix.paths.whew_test")
         pf = PathFinder(basedir=modpath.basedir)
         r = list(pf._find_prefix_paths(pf.basedir, "find.paths"))
         self.assertEqual(1, len(r))
 
         basedir = testdata.create_dir()
         other_basedir = testdata.create_dir("other/directory", basedir)
-        other_modpath = testdata.create_module("tests.fpp_test", [], other_basedir)
-        modpath = testdata.create_module("tests.fpp_test", [], basedir)
+        other_modpath = testdata.create_module(
+            modpath="tests.fpp_test",
+            tmpdir=other_basedir
+        )
+        modpath = testdata.create_module(
+            modpath="tests.fpp_test",
+            tmpdir=basedir
+        )
 
         pf = PathFinder(basedir=basedir)
         r = list(pf._find_prefix_paths(basedir, "tests"))
@@ -102,7 +110,6 @@ class PathFinderTest(TestCase):
 
     def test_glob(self):
         modpath = testdata.create_module(
-            "globbartests.globfoo_test",
             [
                 "from unittest import TestCase",
                 "",
@@ -110,8 +117,13 @@ class PathFinderTest(TestCase):
                 "    def test_bar(self):",
                 "        pass",
             ],
+            modpath="globbartests.globfoo_test",
         )
-        pf = PathFinder(basedir=modpath.basedir, prefix="*bar", module_name="*foo")
+        pf = PathFinder(
+            basedir=modpath.basedir,
+            prefix="*bar",
+            module_name="*foo"
+        )
         r = list(pf.paths())
         self.assertEqual(1, len(r))
 
@@ -121,60 +133,27 @@ class PathFinderTest(TestCase):
         r = pf._find_basename("*bar", ["globbartests"], is_prefix=False)
         self.assertEqual("globbartests", r)
 
-        r = pf._find_basename("*foo", ["globfoo_test.py", "__init__.py"], is_prefix=False)
+        r = pf._find_basename(
+            "*foo",
+            ["globfoo_test.py", "__init__.py"],
+            is_prefix=False
+        )
         self.assertEqual("globfoo_test.py", r)
 
-        r = pf._find_basename("*foo", ["globfoo_test.py", "__init__.py"], is_prefix=True)
+        r = pf._find_basename(
+            "*foo",
+            ["globfoo_test.py", "__init__.py"],
+            is_prefix=True
+        )
         self.assertEqual("globfoo_test.py", r)
-
-        pf = PathFinder(basedir=modpath.basedir, prefix="bar", module_name="foo")
-        r = list(pf.paths())
-        self.assertEqual(0, len(r))
-
-    def test_issue_24(self):
-        """Turns out I can't fix this issue, so this test is kind of useless"""
-        # trying to setup the environment according to: https://github.com/Jaymon/pyt/issues/24
-        raise self.skipTest("won't fix")
-        basedir = testdata.create_dir()
-        other_basedir = testdata.create_dir("other/directory", basedir)
-
-        other_modpath = testdata.create_module(
-            "i24tests.model24_test",
-            [
-                "from unittest import TestCase",
-                "",
-                "class Issue24TestCase(TestCase):",
-                "   def test_boo(self):",
-                "       pass",
-            ],
-            other_basedir
-        )
-
-        modpath = testdata.create_module(
-            "i24tests.model24_test",
-            [
-                "from unittest import TestCase",
-                "",
-                "class Issue24TestCase(TestCase):",
-                "   def test_boo(self):",
-                "       pass",
-            ],
-            basedir
-        )
-
-        #pout.v(basedir, other_modpath.path, modpath.path)
 
         pf = PathFinder(
-            basedir=basedir,
-            module_name="model24",
-            prefix="i24tests",
-            class_name="Issue24",
-            method_name="boo"
+            basedir=modpath.basedir,
+            prefix="bar",
+            module_name="foo"
         )
-
-        r = list(pf.method_names())
-        self.assertEqual(2, len(r))
-        self.assertNotEqual(r[0], r[1])
+        r = list(pf.paths())
+        self.assertEqual(0, len(r))
 
     def test__find_basename(self):
         pf = PathFinder(basedir="/does/not/matter")
@@ -342,41 +321,116 @@ class PathGuesserTest(TestCase):
             ('foo.Bar', [
                 {'module_name': 'foo', 'class_name': 'Bar', 'prefix': ''}
             ]),
-            ('foo.Bar.baz', [
-                {'module_name': 'foo', 'class_name': 'Bar', 'prefix': '', 'method_name': 'baz'}
-            ]),
-            ('prefix.foo.Bar.baz', [
-                {'module_name': 'foo', 'class_name': 'Bar', 'prefix': 'prefix', 'method_name': 'baz'}
-            ]),
-            ('pre.fix.foo.Bar.baz', [
-                {'module_name': 'foo', 'class_name': 'Bar', 'prefix': 'pre/fix', 'method_name': 'baz'}
-            ]),
-            ('Call.controller', [
-                {'class_name': 'Call', 'method_name': 'controller', 'prefix': '', 'module_name': ''}
-            ]),
-            ('Call', [
-                {'class_name': 'Call', 'prefix': '', 'module_name': ''}
-            ]),
+            (
+                'foo.Bar.baz',
+                [
+                    {
+                        'module_name': 'foo',
+                        'class_name': 'Bar',
+                        'prefix': '',
+                        'method_name': 'baz'
+                    }
+                ]
+            ),
+            (
+                'prefix.foo.Bar.baz',
+                [
+                    {
+                        'module_name': 'foo',
+                        'class_name': 'Bar',
+                        'prefix': 'prefix',
+                        'method_name': 'baz'
+                    }
+                ]
+            ),
+            (
+                'pre.fix.foo.Bar.baz',
+                [
+                    {
+                        'module_name': 'foo',
+                        'class_name': 'Bar',
+                        'prefix': 'pre/fix',
+                        'method_name': 'baz'
+                    }
+                ]
+            ),
+            (
+                'Call.controller',
+                [
+                    {
+                        'class_name': 'Call',
+                        'method_name': 'controller',
+                        'prefix': '',
+                        'module_name': ''
+                    }
+                ]
+            ),
+            (
+                'Call',
+                [
+                    {'class_name': 'Call', 'prefix': '', 'module_name': ''}
+                ]
+            ),
             ('Boom.fooBar', [
-                {'class_name': 'Boom', 'prefix': '', 'module_name': '', 'method_name': 'fooBar'}
+                {
+                    'class_name': 'Boom',
+                    'prefix': '',
+                    'module_name': '',
+                    'method_name': 'fooBar'
+                }
             ]),
-            ('get_SQL', [
-                {'module_name': 'get_SQL', 'prefix': ''},
-                {'method_name': 'get_SQL', 'module_name': '', 'prefix': ''}
-            ]),
+            (
+                'get_SQL',
+                [
+                    {'module_name': 'get_SQL', 'prefix': ''},
+                    {'method_name': 'get_SQL', 'module_name': '', 'prefix': ''}
+                ]
+            ),
+            (
+                'prefix1.prefix2.modname:ClassName.method_name',
+                [
+                    {
+                        'class_name': 'ClassName',
+                        'prefix': 'prefix1.prefix2',
+                        'module_name': 'modname',
+                        'method_name': 'method_name'
+                    }
+                ]
+            ),
+            (
+                'modname:ClassName',
+                [
+                    {
+                        'class_name': 'ClassName',
+                        'module_name': 'modname',
+                        'method_name': None,
+                    }
+                ]
+            ),
+            (
+                'modname:method_name',
+                [
+                    {
+                        'class_name': None,
+                        'module_name': 'modname',
+                        'method_name': 'method_name'
+                    }
+                ]
+            ),
         )
 
+        basedir = testdata.create_dir()
+
         for test_in, test_out in tests:
-            ti = PathGuesser(test_in, '/tmp')
+            ti = PathGuesser(test_in, basedir)
             for i, to in enumerate(test_out):
                 for k, v in to.items():
-                    r = getattr(ti.possible[i], k)
-                    self.assertEqual(v, r)
+                    r = getattr(ti.possible[i], k, None)
+                    self.assertEqual(v, r, test_in)
 
     def test_no_name(self):
-        ti = PathGuesser('', '/tmp')
+        ti = PathGuesser('', testdata.create_dir())
         self.assertEqual(1, len(ti.possible))
-
 
 
 class RerunFileTest(TestCase):
@@ -407,6 +461,4 @@ class RerunFileTest(TestCase):
         for line in rf:
             self.assertTrue(line)
             self.assertTrue(line in rf)
-
-
 

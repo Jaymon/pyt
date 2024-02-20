@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division, print_function, absolute_import
 import re
 import os
 import unittest
@@ -9,6 +8,7 @@ import importlib
 import logging
 import hashlib
 import site
+import tempfile
 
 from .compat import *
 from .utils import modname
@@ -19,8 +19,10 @@ logger = logging.getLogger(__name__)
 
 class RerunFile(object):
     def __init__(self):
-        import tempfile
-        self.filepath = os.path.join(tempfile.gettempdir(), "{}.txt".format(modname()))
+        self.filepath = os.path.join(
+            tempfile.gettempdir(),
+            "{}.txt".format(modname())
+        )
 
     def __enter__(self):
         self.fp = open(self.filepath, encoding="utf-8", mode="w+")
@@ -47,8 +49,8 @@ class RerunFile(object):
 class PathGuesser(object):
     """PathGuesser
 
-    This class compiles the possible paths, it is created in the TestLoader and then 
-    the .possible attribute is iterated to actually load the tests.
+    This class compiles the possible paths, it is created in the TestLoader and
+    then the .possible attribute are iterated to actually load the tests.
 
     The .possible property consists of PathFinder objects
 
@@ -64,20 +66,31 @@ class PathGuesser(object):
 
     def raise_any_error(self):
         """raise any found error in the possible PathFinders"""
-        for tc in self.possible:
-            tc.raise_found_error()
+        for path_finder in self.possible:
+            path_finder.raise_found_error()
+
+    def get_any_error(self):
+        for path_finder in self.possible:
+            if exc_info := path_finder.get_found_error():
+                yield exc_info
 
     def set_possible(self):
         '''
-        break up a module path to its various parts (prefix, module, class, method)
+        break up a module path to its various parts (prefix, module, class,
+        method, etc)
 
-        this uses PEP 8 conventions, so foo.Bar would be foo module with class Bar
+        this uses PEP 8 conventions, so foo.Bar would be foo module with class
+        Bar
 
-        return -- list -- a list of possible interpretations of the module path
-            (eg, foo.bar can be bar module in foo module, or bar method in foo module)
+        :returns: list[PathFinder], a list of possible interpretations of the
+            module path (eg, foo.bar can be bar module in foo module,
+            or bar method in foo module)
         '''
         possible = []
         name = self.name
+        basedir = self.basedir
+        method_prefix = self.method_prefix
+
         logger.debug('Guessing test name: {}'.format(name))
 
         name_f = self.name.lower()
@@ -90,63 +103,119 @@ class PathGuesser(object):
 
             name = bits[1] if len(bits) > 1 else ""
             if name:
-                logger.debug('Found test name: {} for filepath: {}'.format(name, filepath))
+                logger.debug('Found test name: {} for filepath: {}'.format(
+                    name,
+                    filepath
+                ))
 
-        bits = name.split('.')
-        basedir = self.basedir
-        method_prefix = self.method_prefix
+        if ":" in name:
+            logger.debug('Found standard python path: {}'.format(name))
 
-        # check if the last bit is a Class
-        if re.search(r'^\*?[A-Z]', bits[-1]):
-            logger.debug('Found class in name: {}'.format(bits[-1]))
-            possible.append(PathFinder(basedir, method_prefix, **{
-                'class_name': bits[-1],
-                'module_name': bits[-2] if len(bits) > 1 else '',
-                'prefix': os.sep.join(bits[0:-2]),
-                'filepath': filepath,
-            }))
-        elif len(bits) > 1 and re.search(r'^\*?[A-Z]', bits[-2]):
-            logger.debug('Found class in name: {}'.format(bits[-2]))
-            possible.append(PathFinder(basedir, method_prefix, **{
-                'class_name': bits[-2],
-                'method_name': bits[-1],
-                'module_name': bits[-3] if len(bits) > 2 else '',
-                'prefix': os.sep.join(bits[0:-3]),
-                'filepath': filepath,
-            }))
+            pfkwargs = {
+                "filepath": filepath
+            }
+
+            modpath, classpath = name.split(":", 1)
+
+            modparts = modpath.rsplit(".", 1)
+            if len(modparts) == 1:
+                pfkwargs["module_name"] = modparts[0]
+
+            else:
+                pfkwargs["prefix"] = modparts[0]
+                pfkwargs["module_name"] = modparts[1]
+
+            classparts = classpath.split(".", 1)
+            if len(classparts) == 1:
+                if classparts[0][0].isupper():
+                    pfkwargs["class_name"] = classparts[0]
+
+                else:
+                    pfkwargs["method_name"] = classparts[0]
+
+            else:
+                pfkwargs["class_name"] = classparts[0]
+                pfkwargs["method_name"] = classparts[1]
+
+            possible.append(
+                PathFinder(
+                    basedir,
+                    method_prefix,
+                    **pfkwargs
+                )
+            )
+
         else:
-            if self.name:
-                if filepath:
-                    if len(bits):
-                        possible.append(PathFinder(basedir, method_prefix, **{
-                            'filepath': filepath,
-                            'method_name': bits[0],
-                        }))
+            bits = name.split('.')
+
+            # check if the last bit is a Class
+            if re.search(r'^\*?[A-Z]', bits[-1]):
+                logger.debug('Found class in name: {}'.format(bits[-1]))
+                possible.append(PathFinder(basedir, method_prefix, **{
+                    'class_name': bits[-1],
+                    'module_name': bits[-2] if len(bits) > 1 else '',
+                    'prefix': os.sep.join(bits[0:-2]),
+                    'filepath': filepath,
+                }))
+
+            elif len(bits) > 1 and re.search(r'^\*?[A-Z]', bits[-2]):
+                logger.debug('Found class in name: {}'.format(bits[-2]))
+                possible.append(PathFinder(basedir, method_prefix, **{
+                    'class_name': bits[-2],
+                    'method_name': bits[-1],
+                    'module_name': bits[-3] if len(bits) > 2 else '',
+                    'prefix': os.sep.join(bits[0:-3]),
+                    'filepath': filepath,
+                }))
+
+            else:
+                if self.name:
+                    if filepath:
+                        if len(bits):
+                            possible.append(
+                                PathFinder(
+                                    basedir,
+                                    method_prefix,
+                                    **{
+                                        'filepath': filepath,
+                                        'method_name': bits[0],
+                                    }
+                                )
+                            )
+
+                        else:
+                            possible.append(
+                                PathFinder(
+                                    basedir,
+                                    method_prefix,
+                                    **{
+                                        'filepath': filepath,
+                                    }
+                                )
+                            )
+
                     else:
+                        logger.debug('Test name is ambiguous')
                         possible.append(PathFinder(basedir, method_prefix, **{
+                            'module_name': bits[-1],
+                            'prefix': os.sep.join(bits[0:-1]),
+                            'filepath': filepath,
+                        }))
+                        possible.append(PathFinder(basedir, method_prefix, **{
+                            'method_name': bits[-1],
+                            'module_name': bits[-2] if len(bits) > 1 else '',
+                            'prefix': os.sep.join(bits[0:-2]),
+                            'filepath': filepath,
+                        }))
+                        possible.append(PathFinder(basedir, method_prefix, **{
+                            'prefix': os.sep.join(bits),
                             'filepath': filepath,
                         }))
 
                 else:
-                    logger.debug('Test name is ambiguous')
-                    possible.append(PathFinder(basedir, method_prefix, **{
-                        'module_name': bits[-1],
-                        'prefix': os.sep.join(bits[0:-1]),
-                        'filepath': filepath,
-                    }))
-                    possible.append(PathFinder(basedir, method_prefix, **{
-                        'method_name': bits[-1],
-                        'module_name': bits[-2] if len(bits) > 1 else '',
-                        'prefix': os.sep.join(bits[0:-2]),
-                        'filepath': filepath,
-                    }))
-                    possible.append(PathFinder(basedir, method_prefix, **{
-                        'prefix': os.sep.join(bits),
-                        'filepath': filepath,
-                    }))
-
-            else:
-                possible.append(PathFinder(basedir, method_prefix, filepath=filepath))
+                    possible.append(
+                        PathFinder(basedir, method_prefix, filepath=filepath)
+                    )
 
         logger.debug("Found {} possible test names".format(len(possible)))
         self.possible = possible
@@ -155,9 +224,9 @@ class PathGuesser(object):
 class PathFinder(object):
     """Pathfinder class
 
-    this is where all the magic happens, PathGuesser guesses on what the paths might
-    be and creates instances of this class, those instances then actually validate
-    the guesses and allow the tests to be loaded or not
+    this is where all the magic happens, PathGuesser guesses on what the paths
+    might be and creates instances of this class, those instances then actually
+    validate the guesses and allow the tests to be loaded or not
     """
     def __init__(self, basedir, method_prefix='test', **kwargs):
         self.basedir = basedir
@@ -181,19 +250,22 @@ class PathFinder(object):
 
     def __str__(self):
         ret = ''
-        for k in ['prefix', 'module_name', 'class_name', 'method_name', 'filepath']:
+
+        ks = ['prefix', 'module_name', 'class_name', 'method_name', 'filepath']
+        for k in ks:
             v = getattr(self, k, None)
             if v:
                 ret += "{}: {}, ".format(k, v)
 
         return ret.rstrip(', ')
 
+    def get_found_error(self):
+        return getattr(self, 'error_info', None)
+
     def raise_found_error(self):
         """raise an error if one was found, otherwise do nothing"""
-        error_info = getattr(self, 'error_info', None)
-        if error_info:
-
-            reraise(*error_info)
+        if exc_info := self.get_found_error():
+            reraise(*exc_info)
 
     def modules(self):
         """return modules that match module_name"""
@@ -202,6 +274,7 @@ class PathFinder(object):
         # basepath as the very first path to check as that should minimize
         # namespace collisions, this is what unittest does also
         sys.path.insert(0, self.basedir)
+
         for p in self.paths():
             # http://stackoverflow.com/questions/67631/
             try:
@@ -211,7 +284,9 @@ class PathFinder(object):
                 yield m
 
             except Exception as e:
-                logger.warning('Caught exception while importing {}: {}'.format(p, e))
+                logger.warning(
+                    'Caught exception while importing {}: {}'.format(p, e)
+                )
                 logger.warning(e, exc_info=True)
                 error_info = getattr(self, 'error_info', None)
                 if not error_info:
@@ -224,7 +299,8 @@ class PathFinder(object):
         sys.path.pop(0)
 
     def classes(self):
-        """the partial self.class_name will be used to find actual TestCase classes"""
+        """the partial self.class_name will be used to find actual TestCase
+        classes"""
         for module in self.modules():
             cs = inspect.getmembers(module, inspect.isclass)
             class_name = getattr(self, 'class_name', '')
@@ -239,12 +315,13 @@ class PathFinder(object):
             for c_name, c in cs:
                 can_yield = True
                 if class_regex and not class_regex.match(c_name):
-                #if class_name and class_name not in c_name:
                     can_yield = False
 
                 if can_yield and issubclass(c, unittest.TestCase):
-                    if c is not unittest.TestCase: # ignore actual TestCase class
-                        logger.debug('class: {} matches {}'.format(c_name, class_name))
+                    if c is not unittest.TestCase:
+                        logger.debug(
+                            'class: {} matches {}'.format(c_name, class_name)
+                        )
                         yield c
 
     def method_names(self):
@@ -252,24 +329,36 @@ class PathFinder(object):
         for c in self.classes():
             #ms = inspect.getmembers(c, inspect.ismethod)
             # http://stackoverflow.com/questions/17019949/
-            ms = inspect.getmembers(c, lambda f: inspect.ismethod(f) or inspect.isfunction(f))
+            ms = inspect.getmembers(
+                c,
+                lambda f: inspect.ismethod(f) or inspect.isfunction(f)
+            )
             method_name = getattr(self, 'method_name', '')
             method_regex = ''
             if method_name:
                 if method_name.startswith(self.method_prefix):
-                    method_regex = re.compile(r'^{}'.format(method_name), flags=re.I)
+                    method_regex = re.compile(
+                        r'^{}'.format(method_name),
+                        flags=re.I
+                    )
 
                 else:
 
                     if method_name.startswith("*"):
                         method_name = method_name.strip("*")
                         method_regex = re.compile(
-                            r'^{}[_]{{0,1}}.*?{}'.format(self.method_prefix, method_name),
+                            r'^{}[_]{{0,1}}.*?{}'.format(
+                                self.method_prefix,
+                                method_name
+                            ),
                             flags=re.I
                         )
                     else:
                         method_regex = re.compile(
-                            r'^{}[_]{{0,1}}{}'.format(self.method_prefix, method_name),
+                            r'^{}[_]{{0,1}}{}'.format(
+                                self.method_prefix,
+                                method_name
+                            ),
                             flags=re.I
                         )
 
@@ -281,20 +370,23 @@ class PathFinder(object):
                     can_yield = False
 
                 if can_yield:
-                    logger.debug('method: {} matches {}'.format(m_name, method_name))
+                    logger.debug('method: {} matches {}'.format(
+                        m_name,
+                        method_name
+                    ))
                     yield c, m_name
 
     def _find_basename(self, name, basenames, is_prefix=False):
-        """check if name combined with test prefixes or postfixes is found anywhere
-        in the list of basenames
+        """check if name combined with test prefixes or postfixes is found
+        anywhere in the list of basenames
 
         :param name: string, the name you're searching for
         :param basenames: list, a list of basenames to check
-        :param is_prefix: bool, True if this is a prefix search, which means it will
-            also check if name matches any of the basenames without the prefixes or
-            postfixes, if it is False then the prefixes or postfixes must be present
-            (ie, the module we're looking for is the actual test module, not the parent
-             modules it's contained in)
+        :param is_prefix: bool, True if this is a prefix search, which means it
+            will also check if name matches any of the basenames without the
+            prefixes or postfixes, if it is False then the prefixes or postfixes
+            must be present (ie, the module we're looking for is the actual test
+            module, not the parent modules it's contained in)
         :returns: string, the basename if it is found
         """
         ret = ""
@@ -325,7 +417,12 @@ class PathFinder(object):
                 if not ret:
                     for pf in self.module_prefixes:
                         n = pf + name
-                        logger.debug('Checking if basename {} starts with {}'.format(basename, n))
+                        logger.debug(
+                            'Checking if basename {} starts with {}'.format(
+                                basename,
+                                n
+                            )
+                        )
                         if glob:
                             if fileroot.startswith(pf) and name in fileroot:
                                 ret = basename
@@ -337,7 +434,12 @@ class PathFinder(object):
 
                 if not ret:
                     if is_prefix:
-                        logger.debug('Checking if basename {} starts with {}'.format(basename, name))
+                        logger.debug(
+                            'Checking if basename {} starts with {}'.format(
+                                basename,
+                                name
+                            )
+                        )
                         if basename.startswith(name) or (glob and name in basename):
                             ret = basename
 
@@ -362,8 +464,8 @@ class PathFinder(object):
         return ret
 
     def _find_prefix_paths(self, basedir, prefix):
-        """the prefix is what comes before the module name (prefix.module_name) so this
-        will only find prefixes, not modules"""
+        """the prefix is what comes before the module name (prefix.module_name)
+        so this will only find prefixes, not modules"""
         ret = basedir
         modnames = re.split(r"[\.\/]", prefix)
         seen_paths = set()
@@ -373,16 +475,27 @@ class PathFinder(object):
             ret = root
             for modname in modnames:
                 for root2, dirs2, files2 in self.walk(ret):
-                    logger.debug("Checking {} for modname {}".format(root2, modname))
+                    logger.debug(
+                        "Checking {} for modname {}".format(root2, modname)
+                    )
                     ret = ""
-                    basename = self._find_basename(modname, dirs2, is_prefix=True)
+                    basename = self._find_basename(
+                        modname,
+                        dirs2,
+                        is_prefix=True
+                    )
                     if basename:
                         ret = os.path.join(root2, basename)
                         logger.debug("Found prefix path {}".format(ret))
                         break
 
                 if not ret:
-                    logger.debug("Could not find a prefix path in {} matching {}".format(root, modname))
+                    logger.debug(
+                        "Could not find a prefix path in {} matching {}".format(
+                            root,
+                            modname
+                        )
+                    )
                     break
 
             if ret:
@@ -398,20 +511,29 @@ class PathFinder(object):
             break
 
         if not ret:
-            raise IOError("Could not find prefix {} in path {}".format(prefix, basedir))
+            raise IOError(
+                "Could not find prefix {} in path {}".format(prefix, basedir)
+            )
 
         return ret
 
     def _find_module_path(self, basedir, modname):
-        """find a module matching modname in basedir and return the path to that module
+        """find a module matching modname in basedir and return the path to that
+        module
 
-        :param basedir: string, the base directory to look for the module in
-        :param modname: string, the module name
-        :returns: string, the full path to the found module, empty if nothing found
+        :param basedir: str, the base directory to look for the module in
+        :param modname: str, the module name
+        :returns: str, the full path to the found module, empty if nothing
+            found
         """
         ret = ""
 
-        logger.debug('Checking for a module that matches {} in {}'.format(modname, basedir))
+        logger.debug(
+            'Checking for a module that matches {} in {}'.format(
+                modname,
+                basedir
+            )
+        )
         for root, dirs, files in self.walk(basedir):
             basename = self._find_basename(modname, files, is_prefix=False)
             if basename:
@@ -423,7 +545,10 @@ class PathFinder(object):
                 if fileroot in modname or modname in fileroot:
                     for pf in self.module_postfixes:
                         n = modname + pf
-                        logger.debug('Checking {} against {}'.format(n, fileroot))
+                        logger.debug(
+                            'Checking {} against {}'.format(n, fileroot)
+                        )
+
                         if fileroot.startswith(n):
                             ret = os.path.join(root, basename)
                             break
@@ -431,7 +556,10 @@ class PathFinder(object):
                     if not ret:
                         for pf in self.module_prefixes:
                             n = pf + modname
-                            logger.debug('Checking {} against {}'.format(n, fileroot))
+                            logger.debug(
+                                'Checking {} against {}'.format(n, fileroot)
+                            )
+
                             if fileroot.startswith(n):
                                 ret = os.path.join(root, basename)
                                 break
@@ -447,60 +575,9 @@ class PathFinder(object):
         if not ret:
             ret = self._find_prefix_path(basedir, modname)
             if not ret:
-                raise IOError("Could not find a module path with {}".format(modname))
-
-        logger.debug("Found module path {}".format(ret))
-        return ret
-
-    def DISABLED_find_module_path(self, basedir, modname):
-        """find a module matching modname in basedir and return the path to that module
-
-        :param basedir: string, the base directory to look for the module in
-        :param modname: string, the module name
-        :returns: string, the full path to the found module, empty if nothing found
-        """
-        ret = ""
-
-        try:
-            ret = self._find_prefix_path(basedir, modname)
-            pout.v(ret)
-
-        except IOError:
-            logger.debug('Checking for a module that matches {} in {}'.format(modname, basedir))
-            for root, dirs, files in self.walk(basedir):
-                basename = self._find_basename(modname, files, is_prefix=False)
-                if basename:
-                    ret = os.path.join(root, basename)
-                    break
-
-                for basename in files:
-                    fileroot = os.path.splitext(basename)[0]
-                    if fileroot in modname or modname in fileroot:
-                        for pf in self.module_postfixes:
-                            n = modname + pf
-                            logger.debug('Checking {} against {}'.format(n, fileroot))
-                            if fileroot.startswith(n):
-                                ret = os.path.join(root, basename)
-                                break
-
-                        if not ret:
-                            for pf in self.module_prefixes:
-                                n = pf + modname
-                                logger.debug('Checking {} against {}'.format(n, fileroot))
-                                if fileroot.startswith(n):
-                                    ret = os.path.join(root, basename)
-                                    break
-
-                        if not ret:
-                            if self._is_module_path(basename) and modname == basename:
-                                ret = os.path.join(root, basename)
-                                break
-
-                    if ret: break
-                if ret: break
-
-        if not ret:
-            raise IOError("Could not find a module path with {}".format(modname))
+                raise IOError(
+                    "Could not find a module path with {}".format(modname)
+                )
 
         logger.debug("Found module path {}".format(ret))
         return ret
@@ -537,7 +614,8 @@ class PathFinder(object):
         filter_system_d = system_d and os.path.commonprefix([system_d, basedir]) != system_d
 
         for root, dirs, files in os.walk(basedir, topdown=True):
-            # ignore dot directories and private directories (start with underscore)
+            # ignore dot directories and private directories (start with
+            # underscore)
             dirs[:] = [d for d in dirs if d[0] != '.' and d[0] != "_"]
 
             if filter_system_d:
@@ -592,7 +670,11 @@ class PathFinder(object):
                                     if self._is_module_path(root):
                                         filepath = os.path.join(root, basename)
                                         if filepath not in seen_paths:
-                                            logger.debug('Module package path: {}'.format(filepath))
+                                            logger.debug(
+                                                'Module package path: {}'.format(
+                                                    filepath
+                                                )
+                                            )
                                             seen_paths.add(filepath)
                                             yield filepath
 
@@ -602,7 +684,11 @@ class PathFinder(object):
                                         if fileroot.endswith(pf):
                                             filepath = os.path.join(root, basename)
                                             if filepath not in seen_paths:
-                                                logger.debug('Module postfix path: {}'.format(filepath))
+                                                logger.debug(
+                                                    'Module postfix path: {}'.format(
+                                                        filepath
+                                                    )
+                                                )
                                                 seen_paths.add(filepath)
                                                 yield filepath
 
@@ -610,7 +696,11 @@ class PathFinder(object):
                                         if fileroot.startswith(pf):
                                             filepath = os.path.join(root, basename)
                                             if filepath not in seen_paths:
-                                                logger.debug('Module prefix path: {}'.format(filepath))
+                                                logger.debug(
+                                                    'Module prefix path: {}'.format(
+                                                        filepath
+                                                    )
+                                                )
                                                 seen_paths.add(filepath)
                                                 yield filepath
 
@@ -634,9 +724,7 @@ class PathFinder(object):
             path_args.extend(prefixes[0:i+1])
             path_args.append('__init__.py')
             prefix_module = os.path.join(*path_args)
-            #logger.debug("Checking prefix modulepath: {}".format(prefix_module))
             if os.path.isfile(prefix_module):
-                #logger.debug("Found start of modulepath: {}".format(prefixes[i]))
                 modpath = prefixes[i:]
                 break
 
@@ -645,17 +733,25 @@ class PathFinder(object):
 
         modpath.append(basename)
 
-        # convert the remaining file path to a python module path that can be imported
+        # convert the remaining file path to a python module path that can be
+        # imported
         module_name = '.'.join(modpath)
-        module_name = re.sub(r'(?:\.__init__)?\.py$', '', module_name, flags=re.I)
-        logger.debug("Module path {} found in filepath {}".format(module_name, filepath))
+        module_name = re.sub(
+            r'(?:\.__init__)?\.py$',
+            '',
+            module_name,
+            flags=re.I
+        )
+        logger.debug(
+            "Module path {} found in filepath {}".format(module_name, filepath)
+        )
         return module_name
 
 
 # !!! Ripped from pout.path
 class SitePackagesDir(String):
-    """Finds the site-packages directory and sets the value of this string to that
-    path"""
+    """Finds the site-packages directory and sets the value of this string to
+    that path"""
     _basepath = ""
     def __new__(cls):
         basepath = cls._basepath
