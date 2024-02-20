@@ -454,6 +454,18 @@ class PathGuesserTest(TestCase):
         ti = PathGuesser('', testdata.create_dir())
         self.assertEqual(1, len(ti.possible))
 
+    def test_standard_output_name(self):
+        """
+        https://github.com/Jaymon/pyt/issues/41
+        """
+        m = TestModule([
+            "class TestbarTest(TestCase):",
+            "    def test_foo(self):",
+            "        pass",
+        ])
+
+        m.client.run("test_foo ({})".format(m.name))
+
 
 class RerunFileTest(TestCase):
     def test_rerun(self):

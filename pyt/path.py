@@ -116,6 +116,10 @@ class PathGuesser(object):
                     filepath
                 ))
 
+        # https://github.com/Jaymon/pyt/issues/41
+        if m := re.match(r"(\S+)\s+\(([^\)]+)\)", name):
+            name = "{}.{}".format(m.group(2), m.group(1))
+
         if ":" in name:
             logger.debug('Found standard python path: {}'.format(name))
 
