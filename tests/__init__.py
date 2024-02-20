@@ -7,6 +7,7 @@ import testdata
 from testdata.client import ModuleCommand
 from testdata import TestCase
 
+
 # remove any global pyt
 # NOTE -- when I actually got rid of the modules (just the .pop() without the
 # reassignment to bak.) it caused all kinds of strange and subtle issues, but
@@ -18,7 +19,8 @@ for n, l in list(logging.Logger.manager.loggerDict.items()):
     if n.startswith("pyt.") or n == "pyt":
         new_n = "bak.{}".format(n)
         l.name = new_n
-        logging.Logger.manager.loggerDict[new_n] = logging.Logger.manager.loggerDict.pop(n)
+        logging.Logger.manager.loggerDict.pop(n)
+        logging.Logger.manager.loggerDict[new_n] = l
 
 
 from pyt.compat import *
@@ -27,7 +29,15 @@ from pyt.tester import TestLoader, main, TestProgram
 from pyt.environ import TestEnviron
 
 
-testdata.basic_logging()
+testdata.basic_logging(
+#     format="|".join([
+#         '[%(levelname).1s',
+#         '%(asctime)s',
+#         '%(process)d.%(thread)d',
+#         '%(name)s', # logger name
+#         '%(pathname)s:%(lineno)s] %(message)s',
+#     ]),
+)
 
 
 class TestModule(object):
@@ -84,8 +94,11 @@ class TestModule(object):
             self.prefix = bits[0] if len(bits) == 2 else ''
             self.name_prefix = bits[1][:4] if len(bits) == 2 else bits[0][:4]
 
-        if len(body) == 1: body = body[0]
+        if len(body) == 1:
+            body = body[0]
+
         self.body = body
+
         if isinstance(self.body, dict):
             for k in self.body:
                 self.body[k] = self._prepare_body(self.body[k])

@@ -286,6 +286,28 @@ class PathFinderTest(TestCase):
         r = pf.module_path(m.path)
         self.assertEqual(m.module, r)
 
+    def test_testnames(self):
+        m = TestModule(
+            [
+                "class TestbarTest(TestCase):",
+                "    def test_foo(self):",
+                "        pass",
+            ],
+            name="testbar_test"
+        )
+
+        r = m.client.run("testbar.Testbar.foo")
+        self.assertTrue("Ran 1 test" in r)
+
+        r = m.client.run("testbar.TestbarTest.foo")
+        self.assertTrue("Ran 1 test" in r)
+
+        r = m.client.run("testbar_test.TestbarTest.foo")
+        self.assertTrue("Ran 1 test" in r)
+
+        r = m.client.run("testbar_test.Testbar.foo")
+        self.assertTrue("Ran 1 test" in r)
+
 
 class PathGuesserTest(TestCase):
     def test_filename(self):

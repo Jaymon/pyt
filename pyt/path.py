@@ -57,6 +57,14 @@ class PathGuesser(object):
     https://docs.python.org/3/library/unittest.html#test-discovery
     """
     def __init__(self, name, basedir="", method_prefix='test', **kwargs):
+        """
+        :param name: str, this is the testname that was passed in via the CLI
+        :param basedir: str, the directory to start searching
+        :param method_prefix: str, this is here because it is defined in
+            TestLoader, so it gets passed in here so TestLoader and this can
+            stay in sync
+        :param **kwargs:
+        """
         self.name = name
         if not basedir:
             basedir = os.getcwd()
@@ -150,7 +158,7 @@ class PathGuesser(object):
 
             # check if the last bit is a Class
             if re.search(r'^\*?[A-Z]', bits[-1]):
-                logger.debug('Found class in name: {}'.format(bits[-1]))
+                logger.debug('Found classname: {}'.format(bits[-1]))
                 possible.append(PathFinder(basedir, method_prefix, **{
                     'class_name': bits[-1],
                     'module_name': bits[-2] if len(bits) > 1 else '',
@@ -159,7 +167,7 @@ class PathGuesser(object):
                 }))
 
             elif len(bits) > 1 and re.search(r'^\*?[A-Z]', bits[-2]):
-                logger.debug('Found class in name: {}'.format(bits[-2]))
+                logger.debug('Found classname: {}'.format(bits[-2]))
                 possible.append(PathFinder(basedir, method_prefix, **{
                     'class_name': bits[-2],
                     'method_name': bits[-1],
@@ -229,6 +237,12 @@ class PathFinder(object):
     validate the guesses and allow the tests to be loaded or not
     """
     def __init__(self, basedir, method_prefix='test', **kwargs):
+        """
+        :param basedir: str, the directory to start searching
+        :param method_prefix: str, passed in because TestLoader defines this so
+            it is passed in to make sure this stays in sync
+        :param **kwargs:
+        """
         self.basedir = basedir
         self.method_prefix = method_prefix
         self.module_prefixes = ["test_", "test"]
@@ -279,7 +293,7 @@ class PathFinder(object):
             # http://stackoverflow.com/questions/67631/
             try:
                 module_name = self.module_path(p)
-                logger.debug("Importing {} from path {}".format(module_name, p))
+                logger.debug("Importing {} ({})".format(module_name, p))
                 m = importlib.import_module(module_name)
                 yield m
 
@@ -327,7 +341,6 @@ class PathFinder(object):
     def method_names(self):
         """return the actual test methods that matched self.method_name"""
         for c in self.classes():
-            #ms = inspect.getmembers(c, inspect.ismethod)
             # http://stackoverflow.com/questions/17019949/
             ms = inspect.getmembers(
                 c,
@@ -338,7 +351,10 @@ class PathFinder(object):
             if method_name:
                 if method_name.startswith(self.method_prefix):
                     method_regex = re.compile(
-                        r'^{}'.format(method_name),
+                        r'^(?:{}[_]?)?{}'.format(
+                            self.method_prefix,
+                            method_name
+                        ),
                         flags=re.I
                     )
 
@@ -363,7 +379,8 @@ class PathFinder(object):
                         )
 
             for m_name, m in ms:
-                if not m_name.startswith(self.method_prefix): continue
+                if not m_name.startswith(self.method_prefix):
+                    continue
 
                 can_yield = True
                 if method_regex and not method_regex.match(m_name):
@@ -743,7 +760,7 @@ class PathFinder(object):
             flags=re.I
         )
         logger.debug(
-            "Module path {} found in filepath {}".format(module_name, filepath)
+            "Module path {} found at filepath {}".format(module_name, filepath)
         )
         return module_name
 
