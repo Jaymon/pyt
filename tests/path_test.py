@@ -308,6 +308,22 @@ class PathFinderTest(TestCase):
         r = m.client.run("testbar_test.Testbar.foo")
         self.assertTrue("Ran 1 test" in r)
 
+    def test_issue_39(self):
+        """
+        https://github.com/Jaymon/pyt/issues/39
+        """
+        m = TestModule(
+            [
+                "class BarTest(TestCase):",
+                "    def test_che(self):",
+                "        pass",
+            ],
+            name="tests.foo.bar_test"
+        )
+        r = m.client.run(["-d", "foo.bar.che"])
+        self.assertTrue("test_che (tests.foo.bar_test.BarTest)" in r)
+        self.assertTrue("Ran 1 test" in r)
+
 
 class PathGuesserTest(TestCase):
     def test_filename(self):
