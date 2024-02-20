@@ -645,6 +645,79 @@ class TestProgramTest(TestCase):
         self.assertTrue("Ran 0 tests" in r)
         self.assertTrue("errors=1" in r)
 
+    def test_issue_36(self):
+        """
+        https://github.com/Jaymon/pyt/issues/36
+        """
+        # strangly, I needed to do @skip(...) to have it correctly wrap the
+        # class but @skip worked just fine for the method
+        m = TestModule([
+            "from unittest import skip",
+            "@skip('blah')",
+            "class OneTest(TestCase):",
+            "    def test_one(self):",
+            "        self.assertEqual(1, 1)",
+            "",
+        ])
+        r = m.client.run([m.name, "-d"])
+        self.assertTrue("Skipped 1 tests" in r)
+
+        m = TestModule([
+            "from unittest import skip",
+            "class OneTest(TestCase):",
+            "    @skip",
+            "    def test_one(self):",
+            "        self.assertEqual(1, 1)",
+            "",
+        ])
+        r = m.client.run([m.name, "-d"])
+        self.assertTrue("Skipped 1 tests" in r)
+
+        m = TestModule([
+            "class OneTest(TestCase):",
+            "    @classmethod",
+            "    def setUpClass(cls):",
+            "        raise ValueError()",
+            "",
+            "    def test_one(self):",
+            "        self.assertEqual(1, 1)",
+            "",
+        ])
+        r = m.client.run([m.name, "-d"], code=1)
+        self.assertTrue("Failed or errored 1 tests" in r)
+        self.assertFalse("_ErrorLoader" in r)
+
+        m = TestModule([
+            "class OneTest(TestCase):",
+            "    def setUp(self):",
+            "        raise ValueError()",
+            "",
+            "    def test_one(self):",
+            "        self.assertEqual(1, 1)",
+            "",
+        ])
+        r = m.client.run([m.name, "-d"], code=1)
+        self.assertTrue("Failed or errored 1 tests" in r)
+
+        m = TestModule([
+            "class OneTest(TestCase):",
+            "    def test_one(self):",
+            "        raise ValueError()",
+            "",
+        ])
+        r = m.client.run([m.name, "-d"], code=1)
+        self.assertTrue("Failed or errored 1 tests" in r)
+
+        m = TestModule([
+            "class OneTest(TestCase):",
+            "    def test_one(self):",
+            "        self.assertEqual(1, 0)",
+            "",
+        ])
+        r = m.client.run([m.name, "-d"], code=1)
+        self.assertTrue("Failed or errored 1 tests" in r)
+
+
 
 class TestLoaderTest(TestCase):
     def test_load_tests_protocol(self):

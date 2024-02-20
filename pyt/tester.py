@@ -136,14 +136,14 @@ class TestResult(BaseTestResult):
     total_tests = 0
 
     def _show_status(self, status):
-        pyt_start = self._pyt_start
-        pyt_stop = time.time()
-        self.stream.writeln(
-            "{} ({}s)".format(
-                status,
-                round(pyt_stop - pyt_start, 2)
+        if pyt_start := getattr(self, "_pyt_start", None):
+            pyt_stop = time.time()
+            self.stream.writeln(
+                "{} ({}s)".format(
+                    status,
+                    round(pyt_stop - pyt_start, 2)
+                )
             )
-        )
 
     def startTest(self, test):
         if self.showAll:

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 from unittest.util import strclass
 from unittest import TestCase
 import itertools
@@ -21,7 +22,13 @@ def testpath(test, method_name=""):
         except AttributeError:
             pass
 
-    return "{}.{}".format(classpath(test), method_name)
+    ret = "{}.{}".format(classpath(test), method_name)
+
+    if "_ErrorHolder" in ret:
+        if m := re.match(r"(\S+)\s+\(([^\)]+)\)", test.description):
+            ret = "{}.{}".format(m.group(2), m.group(1))
+
+    return ret
 
 
 def classpath(v):
