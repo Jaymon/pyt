@@ -16,7 +16,7 @@ import sys
 from .tester import main # so you can do pyt.main like unittest.main
 
 
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 
 
 def get_counts():

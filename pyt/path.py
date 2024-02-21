@@ -70,6 +70,7 @@ class PathGuesser(object):
             basedir = os.getcwd()
         self.basedir = basedir
         self.method_prefix = method_prefix
+        self.prefixes = kwargs.get("prefixes", [])
         self.set_possible()
 
     def raise_any_error(self):
@@ -98,6 +99,7 @@ class PathGuesser(object):
         name = self.name
         basedir = self.basedir
         method_prefix = self.method_prefix
+        prefixes = self.prefixes
 
         logger.debug('Guessing test name: {}'.format(name))
 
@@ -153,6 +155,7 @@ class PathGuesser(object):
                 PathFinder(
                     basedir,
                     method_prefix,
+                    prefixes=prefixes,
                     **pfkwargs
                 )
             )
@@ -163,22 +166,36 @@ class PathGuesser(object):
             # check if the last bit is a Class
             if re.search(r'^\*?[A-Z]', bits[-1]):
                 logger.debug('Found classname: {}'.format(bits[-1]))
-                possible.append(PathFinder(basedir, method_prefix, **{
-                    'class_name': bits[-1],
-                    'module_name': bits[-2] if len(bits) > 1 else '',
-                    'prefix': os.sep.join(bits[0:-2]),
-                    'filepath': filepath,
-                }))
+                possible.append(
+                    PathFinder(
+                        basedir,
+                        method_prefix,
+                        **{
+                            'class_name': bits[-1],
+                            'module_name': bits[-2] if len(bits) > 1 else '',
+                            'prefix': os.sep.join(bits[0:-2]),
+                            'filepath': filepath,
+                            "prefixes": prefixes,
+                        }
+                    )
+                )
 
             elif len(bits) > 1 and re.search(r'^\*?[A-Z]', bits[-2]):
                 logger.debug('Found classname: {}'.format(bits[-2]))
-                possible.append(PathFinder(basedir, method_prefix, **{
-                    'class_name': bits[-2],
-                    'method_name': bits[-1],
-                    'module_name': bits[-3] if len(bits) > 2 else '',
-                    'prefix': os.sep.join(bits[0:-3]),
-                    'filepath': filepath,
-                }))
+                possible.append(
+                    PathFinder(
+                        basedir,
+                        method_prefix,
+                        **{
+                            'class_name': bits[-2],
+                            'method_name': bits[-1],
+                            'module_name': bits[-3] if len(bits) > 2 else '',
+                            'prefix': os.sep.join(bits[0:-3]),
+                            'filepath': filepath,
+                            "prefixes": prefixes,
+                        }
+                    )
+                )
 
             else:
                 if self.name:
@@ -191,6 +208,7 @@ class PathGuesser(object):
                                     **{
                                         'filepath': filepath,
                                         'method_name': bits[0],
+                                        "prefixes": prefixes,
                                     }
                                 )
                             )
@@ -202,31 +220,58 @@ class PathGuesser(object):
                                     method_prefix,
                                     **{
                                         'filepath': filepath,
+                                        "prefixes": prefixes,
                                     }
                                 )
                             )
 
                     else:
                         logger.debug('Test name is ambiguous')
-                        possible.append(PathFinder(basedir, method_prefix, **{
-                            'module_name': bits[-1],
-                            'prefix': os.sep.join(bits[0:-1]),
-                            'filepath': filepath,
-                        }))
-                        possible.append(PathFinder(basedir, method_prefix, **{
-                            'method_name': bits[-1],
-                            'module_name': bits[-2] if len(bits) > 1 else '',
-                            'prefix': os.sep.join(bits[0:-2]),
-                            'filepath': filepath,
-                        }))
-                        possible.append(PathFinder(basedir, method_prefix, **{
-                            'prefix': os.sep.join(bits),
-                            'filepath': filepath,
-                        }))
+                        possible.append(
+                            PathFinder(
+                                basedir,
+                                method_prefix,
+                                **{
+                                    'module_name': bits[-1],
+                                    'prefix': os.sep.join(bits[0:-1]),
+                                    'filepath': filepath,
+                                    "prefixes": prefixes,
+                                }
+                            )
+                        )
+                        possible.append(
+                            PathFinder(
+                                basedir,
+                                method_prefix,
+                                **{
+                                    'method_name': bits[-1],
+                                    'module_name': bits[-2] if len(bits) > 1 else '',
+                                    'prefix': os.sep.join(bits[0:-2]),
+                                    'filepath': filepath,
+                                    "prefixes": prefixes,
+                                }
+                            )
+                        )
+                        possible.append(
+                            PathFinder(
+                                basedir,
+                                method_prefix,
+                                **{
+                                    'prefix': os.sep.join(bits),
+                                    'filepath': filepath,
+                                    "prefixes": prefixes,
+                                }
+                            )
+                        )
 
                 else:
                     possible.append(
-                        PathFinder(basedir, method_prefix, filepath=filepath)
+                        PathFinder(
+                            basedir,
+                            method_prefix,
+                            filepath=filepath,
+                            prefixes=prefixes,
+                        )
                     )
 
         logger.debug("Found {} possible test names".format(len(possible)))
@@ -668,6 +713,7 @@ class PathFinder(object):
         else:
             if module_prefix:
                 basedirs = self._find_prefix_paths(self.basedir, module_prefix)
+
             else:
                 basedirs = [self.basedir]
 

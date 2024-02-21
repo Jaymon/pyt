@@ -53,7 +53,7 @@ class TestModule(object):
     def loader(self):
         tl = TestLoader()
         tl._top_level_dir = self.cwd
-        tl.testprogram = testdata.mock(environ=TestEnviron())
+        tl.program = testdata.mock(environ=TestEnviron())
         return tl
     tl = loader
 

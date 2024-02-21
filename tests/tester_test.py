@@ -717,24 +717,24 @@ class TestProgramTest(TestCase):
         r = m.client.run([m.name, "-d"], code=1)
         self.assertTrue("Failed or errored 1 tests" in r)
 
-    def test_prefix_flag(self):
-        """
-        https://github.com/Jaymon/pyt/issues/44
-        """
-        return
-
-        m = TestModule([
-            "class OneTest(TestCase):",
-            "    def test_one(self):",
-            "        pass",
-            "",
-        ])
-
-        pout.v(m.name)
-
-        prefix, modname = m.name.split(".", 1)
-
-        m.client.run(["--prefix", prefix, modname])
+#     def test_prefix_flag(self):
+#         """
+#         https://github.com/Jaymon/pyt/issues/44
+#         """
+#         return
+# 
+#         m = TestModule([
+#             "class OneTest(TestCase):",
+#             "    def test_one(self):",
+#             "        pass",
+#             "",
+#         ])
+# 
+#         pout.v(m.name)
+# 
+#         prefix, modname = m.name.split(".", 1)
+# 
+#         m.client.run(["--prefix", prefix, modname])
 
 
 

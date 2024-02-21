@@ -88,34 +88,35 @@ class TestLoader(BaseTestLoader):
         else:
             ts = self.loadTestsFromName("", *args, **kwargs)
 
-        ts.testprogram = self.testprogram
+        ts.program = self.program
 
         test_count = ts.countTestCases()
         logger.debug("Found {} total tests".format(test_count))
 
-        self.testprogram.environ.update_env_for_test(test_count)
+        self.program.environ.update_env_for_test(test_count)
 
         return ts
 
     def loadTestsFromName(self, name, *args, **kwargs):
         ts = self.suiteClass()
-        testprogram = self.testprogram
-        environ = testprogram.environ
+        program = self.program
+        environ = program.environ
 
-        ts.testprogram = testprogram
-        ts.path_guesser = ti = PathGuesser(
+        ts.program = program
+        ts.path_guesser = pg = PathGuesser(
             name,
             basedir=self._top_level_dir,
-            method_prefix=self.testMethodPrefix
+            method_prefix=self.testMethodPrefix,
+            prefixes=program.prefixes
         )
         found = False
 
-        logger.debug("Searching for tests in directory: {}".format(ti.basedir))
+        logger.debug("Searching for tests in directory: {}".format(pg.basedir))
 
-        for i, tc in enumerate(ti.possible, 1):
-            logger.debug("{}. Searching for tests matching: {}".format(i, tc))
-            if tc.has_method():
-                for c, mn in tc.method_names():
+        for i, pf in enumerate(pg.possible, 1):
+            logger.debug("{}. Searching for tests matching: {}".format(i, pf))
+            if pf.has_method():
+                for c, mn in pf.method_names():
                     logger.debug(
                         'Found method test: {}'.format(testpath(c, mn))
                     )
@@ -123,15 +124,15 @@ class TestLoader(BaseTestLoader):
                     ts.addTest(c(mn))
                     environ.counter["methods"] += 1
 
-            elif tc.has_class():
-                for c in tc.classes():
+            elif pf.has_class():
+                for c in pf.classes():
                     logger.debug('Found class test: {}'.format(classpath(c)))
                     found = True
                     ts.addTest(self.loadTestsFromTestCase(c))
                     environ.counter["classes"] += 1
 
             else:
-                for m in tc.modules():
+                for m in pf.modules():
                     logger.debug('Found module test: {}'.format(m.__name__))
                     found = True
                     ts.addTest(self.loadTestsFromModule(m))
@@ -140,14 +141,6 @@ class TestLoader(BaseTestLoader):
                 # if we found a module that matched then don't try for method
                 if found:
                     break
-
-#         if not found:
-#             ti.raise_any_error()
-# 
-#         test_count = ts.countTestCases()
-#         logger.debug("Found {} total tests".format(test_count))
-# 
-#         environ.update_env_for_test(test_count)
 
         return ts
 
@@ -172,7 +165,7 @@ class TestResult(BaseTestResult):
             self._pyt_start = time.time()
             self.stream.write("{}/{} ".format(
                 self.testsRun + 1,
-                self.testprogram.environ.test_count,
+                self.program.environ.test_count,
             ))
             self.stream.flush()
         super().startTest(test)
@@ -251,18 +244,15 @@ class TestRunner(BaseTestRunner):
     resultclass = TestResult
 
     def _makeResult(self):
-        testresult = super()._makeResult()
-        testresult.testprogram = self.testprogram
-        return testresult
+        result = super()._makeResult()
+        result.program = self.program
+        return result
 
     def run(self, test):
-        # this will be used to set testprogram into TestResult
-        self.testprogram = test.testprogram
-#         self.running_test = test
+        # this will be used to set the TestProgram instance into TestResult
+        self.program = test.program
 
         result = super().run(test)
-
-#         self.running_test = None
 
         if self.verbosity > 1:
             if len(result.errors) or len(result.failures):
@@ -327,7 +317,7 @@ class TestProgram(BaseTestProgram):
         testloader = TestLoader()
         # we want to keep open the possibility of grabbing values from this
         # later on down the line
-        testloader.testprogram = self
+        testloader.program = self
 
         kwargs.setdefault('testLoader', testloader)
 
@@ -345,24 +335,6 @@ class TestProgram(BaseTestProgram):
         # the tests, it must call .runTests which can call sys.exit
         super().__init__(**kwargs)
 
-#     def _print_help(self, *args, **kwargs):
-#         class DP(object):
-#             def print_help(self):
-#                 pass
-# 
-#         self._discovery_parser = DP()
-# 
-#         super()._print_help(*args, **kwargs)
-
-#     def _do_discovery(self, argv, Loader=None):
-#         self.createTests(
-#             from_discover=False,
-#             Loader=Loader
-#         )
-# 
-#     def _getDiscoveryArgParser(self, parent):
-#         return None
-
     def createTests(self, from_discovery=False, Loader=None):
         """Ideally we would put a lot of this configuration in .parseArgs but
         that method calls this method or ._do_discovery
@@ -376,14 +348,9 @@ class TestProgram(BaseTestProgram):
         if not self.testNames:
             self.testNames = []
 
-#         test_names = getattr(self, "testNames", [])
-#         if len(test_names) == 1 and not test_names[0]:
-#             if self.rerun:
-#                 self.testNames = list(RerunFile())
-
         # if no prefixes were passed in through the CLI then we'll use any
         # environment defined prefixes
-        if not self.prefixes:
+        if not getattr(self, "prefixes", None):
             self.prefixes = self.environ.get_prefixes()
 
         # TestLoader is used to load the tests and .test is set in parent's 
@@ -392,18 +359,6 @@ class TestProgram(BaseTestProgram):
             from_discovery=False,
             Loader=Loader
         )
-
-#     def _getMainArgParser(self, parent):
-#         parser = super()._getMainArgParser(parent)
-# 
-#         # python3 will trigger discovery if no tests are passed in, so we
-#         # override that functionality so we get routed to our path guesser
-#         for action in parser._actions:
-#             if action.dest == "tests":
-#                 action.default = [""]
-#                 break
-# 
-#         return parser
 
     def _getParentArgParser(self):
         """Get the argument parser and add any custom flags
@@ -449,17 +404,17 @@ class TestProgram(BaseTestProgram):
             help='Rerun previously failed tests'
         )
 
-        parser.add_argument(
-            '--prefix', "-P",
-            dest="prefixes",
-            action="append",
-            default=[],
-            #default=self.environ.get_prefixes(),
-            help=(
-                "The prefix(es)"
-                " (python module paths where TestCase subclasses are found)"
-            )
-        )
+#         parser.add_argument(
+#             '--prefix', "-P",
+#             dest="prefixes",
+#             action="append",
+#             default=[],
+#             #default=self.environ.get_prefixes(),
+#             help=(
+#                 "The prefix(es)"
+#                 " (python module paths where TestCase subclasses are found)"
+#             )
+#         )
 
         return parser
 
