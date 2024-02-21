@@ -214,7 +214,7 @@ class TestProgramTest(TestCase):
         r = s.run(["--verbose", "bar", "che"])
         self.assertTrue("bar_test" in r)
         self.assertTrue("che_test" in r)
-        self.assertEqual(2, r.count("Found 1 total tests"))
+        self.assertTrue("Found 2 total tests" in r)
 
     def test_double_counting_and_pyc(self):
         """Make sure packages don't get double counted"""
@@ -716,6 +716,25 @@ class TestProgramTest(TestCase):
         ])
         r = m.client.run([m.name, "-d"], code=1)
         self.assertTrue("Failed or errored 1 tests" in r)
+
+    def test_prefix_flag(self):
+        """
+        https://github.com/Jaymon/pyt/issues/44
+        """
+        return
+
+        m = TestModule([
+            "class OneTest(TestCase):",
+            "    def test_one(self):",
+            "        pass",
+            "",
+        ])
+
+        pout.v(m.name)
+
+        prefix, modname = m.name.split(".", 1)
+
+        m.client.run(["--prefix", prefix, modname])
 
 
 

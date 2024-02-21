@@ -16,7 +16,7 @@ import platform
 import warnings
 
 from .compat import *
-from .utils import testpath, classpath, chain, loghandler_members
+from .utils import testpath, classpath, chain, loghandler_members, modname
 from .environ import TestEnviron
 from .path import PathGuesser, PathFinder, RerunFile
 
@@ -80,9 +80,29 @@ class TestLoader(BaseTestLoader):
     """
     suiteClass = TestSuite
 
+    def loadTestsFromNames(self, names, *args, **kwargs):
+
+        if names:
+            ts = super().loadTestsFromNames(names, *args, **kwargs)
+
+        else:
+            ts = self.loadTestsFromName("", *args, **kwargs)
+
+        ts.testprogram = self.testprogram
+
+        test_count = ts.countTestCases()
+        logger.debug("Found {} total tests".format(test_count))
+
+        self.testprogram.environ.update_env_for_test(test_count)
+
+        return ts
+
     def loadTestsFromName(self, name, *args, **kwargs):
         ts = self.suiteClass()
-        environ = TestEnviron.get_instance()
+        testprogram = self.testprogram
+        environ = testprogram.environ
+
+        ts.testprogram = testprogram
         ts.path_guesser = ti = PathGuesser(
             name,
             basedir=self._top_level_dir,
@@ -121,10 +141,14 @@ class TestLoader(BaseTestLoader):
                 if found:
                     break
 
-        if not found:
-            ti.raise_any_error()
+#         if not found:
+#             ti.raise_any_error()
+# 
+#         test_count = ts.countTestCases()
+#         logger.debug("Found {} total tests".format(test_count))
+# 
+#         environ.update_env_for_test(test_count)
 
-        logger.debug("Found {} total tests".format(ts.countTestCases()))
         return ts
 
 
@@ -133,8 +157,6 @@ class TestResult(BaseTestResult):
     https://github.com/python/cpython/blob/3.7/Lib/unittest/result.py
     https://github.com/python/cpython/blob/3.7/Lib/unittest/runner.py
     """
-    total_tests = 0
-
     def _show_status(self, status):
         if pyt_start := getattr(self, "_pyt_start", None):
             pyt_stop = time.time()
@@ -150,7 +172,7 @@ class TestResult(BaseTestResult):
             self._pyt_start = time.time()
             self.stream.write("{}/{} ".format(
                 self.testsRun + 1,
-                self.total_tests,
+                self.testprogram.environ.test_count,
             ))
             self.stream.flush()
         super().startTest(test)
@@ -229,18 +251,18 @@ class TestRunner(BaseTestRunner):
     resultclass = TestResult
 
     def _makeResult(self):
-        instance = super()._makeResult()
-        instance.total_tests = self.running_test.countTestCases()
-
-        environ = TestEnviron.get_instance()
-        environ.update_env_for_test(instance.total_tests)
-
-        return instance
+        testresult = super()._makeResult()
+        testresult.testprogram = self.testprogram
+        return testresult
 
     def run(self, test):
-        self.running_test = test
+        # this will be used to set testprogram into TestResult
+        self.testprogram = test.testprogram
+#         self.running_test = test
+
         result = super().run(test)
-        self.running_test = None
+
+#         self.running_test = None
 
         if self.verbosity > 1:
             if len(result.errors) or len(result.failures):
@@ -282,7 +304,7 @@ class TestProgram(BaseTestProgram):
     def verbosity(self, v):
         self._verbosity = v
 
-        logger_name = __name__.split(".")[0]
+        logger_name = modname()
         logger = logging.getLogger(logger_name)
         if len(logger.handlers) == 0:
             log_handler = logging.StreamHandler(stream=sys.stderr)
@@ -297,35 +319,98 @@ class TestProgram(BaseTestProgram):
             logger.setLevel(logging.DEBUG)
 
     def __init__(self, **kwargs):
-        kwargs.setdefault('testLoader', TestLoader())
-        kwargs.setdefault('testRunner', TestRunner)
-        super().__init__(**kwargs)
+        self.environ = TestEnviron()
 
-    def createTests(self, *args, **kwargs):
-        # if we didn't pass in any test names then we want to find all tests
-        test_names = getattr(self, "testNames", [])
-        if len(test_names) == 1 and not test_names[0]:
-            if self.rerun:
-                self.testNames = list(RerunFile())
-
-        super().createTests(*args, **kwargs)
-
+        # according to the code, testLoader gets defaulted to
+        # unittest.loader.defaultTestLoader which is an instance, so to override
+        # it we should pass in our loader as an instance also
+        testloader = TestLoader()
         # we want to keep open the possibility of grabbing values from this
         # later on down the line
-        self.test.main = self
+        testloader.testprogram = self
 
-    def _getMainArgParser(self, parent):
-        parser = super()._getMainArgParser(parent)
+        kwargs.setdefault('testLoader', testloader)
 
-        # python3 will trigger discovery if no tests are passed in, so we
-        # override that functionality so we get routed to our path guesser
-        for action in parser._actions:
-            if action.dest == "tests":
-                action.default = [""]
-        #pout.v(parser._positionals)
-        return parser
+        # according to the code testRunner is defaulted to a None and set to a
+        # class in .runTests, where an instance is then created, so there are
+        # no hooks to customize creation of it, it does pass .test into its
+        # .run method though, so the hook will have to be there
+        kwargs.setdefault('testRunner', TestRunner)
+
+        # we want to get around all the .module is None checks
+        kwargs.setdefault("module", __name__)
+
+        # anything after this line will not be run because once we enter into
+        # the parent's __init__ then it begins to actually compile and call all
+        # the tests, it must call .runTests which can call sys.exit
+        super().__init__(**kwargs)
+
+#     def _print_help(self, *args, **kwargs):
+#         class DP(object):
+#             def print_help(self):
+#                 pass
+# 
+#         self._discovery_parser = DP()
+# 
+#         super()._print_help(*args, **kwargs)
+
+#     def _do_discovery(self, argv, Loader=None):
+#         self.createTests(
+#             from_discover=False,
+#             Loader=Loader
+#         )
+# 
+#     def _getDiscoveryArgParser(self, parent):
+#         return None
+
+    def createTests(self, from_discovery=False, Loader=None):
+        """Ideally we would put a lot of this configuration in .parseArgs but
+        that method calls this method or ._do_discovery
+        """
+        # if we didn't pass in any test names then we want to find all tests
+        if not self.tests and self.rerun:
+            self.testNames = list(RerunFile())
+
+        # we need to set .testNames to anything but None to short circuit
+        # parent's routing to try and load tests from a module
+        if not self.testNames:
+            self.testNames = []
+
+#         test_names = getattr(self, "testNames", [])
+#         if len(test_names) == 1 and not test_names[0]:
+#             if self.rerun:
+#                 self.testNames = list(RerunFile())
+
+        # if no prefixes were passed in through the CLI then we'll use any
+        # environment defined prefixes
+        if not self.prefixes:
+            self.prefixes = self.environ.get_prefixes()
+
+        # TestLoader is used to load the tests and .test is set in parent's 
+        # .createTest method
+        super().createTests(
+            from_discovery=False,
+            Loader=Loader
+        )
+
+#     def _getMainArgParser(self, parent):
+#         parser = super()._getMainArgParser(parent)
+# 
+#         # python3 will trigger discovery if no tests are passed in, so we
+#         # override that functionality so we get routed to our path guesser
+#         for action in parser._actions:
+#             if action.dest == "tests":
+#                 action.default = [""]
+#                 break
+# 
+#         return parser
 
     def _getParentArgParser(self):
+        """Get the argument parser and add any custom flags
+
+        NOTE -- anything flag you define will be set as an instance attribute
+        on self
+        """
         from . import __version__ # avoid circular dependency
 
         parser = super()._getParentArgParser()
@@ -362,6 +447,18 @@ class TestProgram(BaseTestProgram):
             '--rerun',
             action='store_true',
             help='Rerun previously failed tests'
+        )
+
+        parser.add_argument(
+            '--prefix', "-P",
+            dest="prefixes",
+            action="append",
+            default=[],
+            #default=self.environ.get_prefixes(),
+            help=(
+                "The prefix(es)"
+                " (python module paths where TestCase subclasses are found)"
+            )
         )
 
         return parser

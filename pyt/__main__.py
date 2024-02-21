@@ -15,7 +15,7 @@ def console():
         executable = os.path.basename(sys.executable)
         sys.argv[0] = executable + " -m pyt"
 
-    main(module=None)
+    main()
 
 
 if __name__ == "__main__":
