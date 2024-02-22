@@ -292,11 +292,20 @@ class TestProgram(BaseTestProgram):
 
         logger_name = modname()
         logger = logging.getLogger(logger_name)
-        if len(logger.handlers) == 0:
+
+        # https://docs.python.org/3/library/logging.html#logging.Logger.hasHandlers
+        if not logger.hasHandlers():
+        #if len(logger.handlers) == 0:
             log_handler = logging.StreamHandler(stream=sys.stderr)
-            log_formatter = logging.Formatter('[%(levelname).1s] %(message)s')
+            log_formatter = logging.Formatter("[%(levelname).1s] %(message)s")
             log_handler.setFormatter(log_formatter)
             logger.addHandler(log_handler)
+            # https://docs.python.org/3/library/logging.html#logging.Logger.propagate
+            #
+            # we turn off propogation for pyt loggers because without this if
+            # the tests that get loaded configured logging (which I commonly do)
+            # then pyt would start double printing everything
+            logger.propagate = False
 
         if v < 2:
             logger.setLevel(logging.WARNING)
@@ -315,13 +324,13 @@ class TestProgram(BaseTestProgram):
         # later on down the line
         testloader.program = self
 
-        kwargs.setdefault('testLoader', testloader)
+        kwargs.setdefault("testLoader", testloader)
 
         # according to the code testRunner is defaulted to a None and set to a
         # class in .runTests, where an instance is then created, so there are
         # no hooks to customize creation of it, it does pass .test into its
         # .run method though, so the hook will have to be there
-        kwargs.setdefault('testRunner', TestRunner)
+        kwargs.setdefault("testRunner", TestRunner)
 
         # we want to get around all the .module is None checks
         kwargs.setdefault("module", __name__)

@@ -34,8 +34,8 @@ class TestEnviron(object):
         :returns: list[str], the prefixes
         """
         ret = []
-        for prefixes in self.nkeys(environ_key):
-            ret.extend(prefixes.split(os.pathsep))
+        for k in self.nkeys(environ_key):
+            ret.extend(os.environ[k].split(os.pathsep))
 
         return ret
 

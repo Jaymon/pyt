@@ -641,7 +641,6 @@ class PathGuesser(object):
 
     def create_finders(self, **kwargs):
         if self.prefixes:
-            pout.i(self.prefixes)
             for prefix in self.prefixes:
                 if prefix:
                     if not kwargs.get("filepath", ""):
