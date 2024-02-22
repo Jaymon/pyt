@@ -76,7 +76,6 @@ class TestLoader(BaseTestLoader):
 
     https://docs.python.org/2/library/unittest.html#unittest.TestLoader
     https://github.com/python/cpython/blob/3.7/Lib/unittest/loader.py
-    https://github.com/python/cpython/blob/2.7/Lib/unittest/loader.py
     """
     suiteClass = TestSuite
 
@@ -148,7 +147,6 @@ class TestLoader(BaseTestLoader):
 class TestResult(BaseTestResult):
     """
     https://github.com/python/cpython/blob/3.7/Lib/unittest/result.py
-    https://github.com/python/cpython/blob/3.7/Lib/unittest/runner.py
     """
     def _show_status(self, status):
         if pyt_start := getattr(self, "_pyt_start", None):
@@ -282,9 +280,7 @@ class TestProgram(BaseTestProgram):
     """The main entrypoint into the module, this is where everything starts
 
     https://docs.python.org/3/library/unittest.html#unittest.main
-    https://docs.python.org/2.7/library/unittest.html#unittest.main
     https://github.com/python/cpython/blob/3.7/Lib/unittest/main.py
-    https://github.com/python/cpython/blob/2.7/Lib/unittest/main.py
     """
     @property
     def verbosity(self):
@@ -363,8 +359,9 @@ class TestProgram(BaseTestProgram):
     def _getParentArgParser(self):
         """Get the argument parser and add any custom flags
 
-        NOTE -- anything flag you define will be set as an instance attribute
-        on self
+        NOTE -- any flag you define will be set as an instance attribute
+        on self because self is passed into the parser's .parse_args method as
+        the Namespace object
         """
         from . import __version__ # avoid circular dependency
 
@@ -404,17 +401,17 @@ class TestProgram(BaseTestProgram):
             help='Rerun previously failed tests'
         )
 
-#         parser.add_argument(
-#             '--prefix', "-P",
-#             dest="prefixes",
-#             action="append",
-#             default=[],
-#             #default=self.environ.get_prefixes(),
-#             help=(
-#                 "The prefix(es)"
-#                 " (python module paths where TestCase subclasses are found)"
-#             )
-#         )
+        parser.add_argument(
+            '--prefix', "-P",
+            dest="prefixes",
+            action="append",
+            default=[],
+            #default=self.environ.get_prefixes(),
+            help=(
+                "The prefix(es)"
+                " (python module paths where TestCase subclasses are found)"
+            )
+        )
 
         return parser
 

@@ -46,238 +46,6 @@ class RerunFile(object):
                 yield line.strip()
 
 
-class PathGuesser(object):
-    """PathGuesser
-
-    This class compiles the possible paths, it is created in the TestLoader and
-    then the .possible attribute are iterated to actually load the tests.
-
-    The .possible property consists of PathFinder objects
-
-    https://docs.python.org/3/library/unittest.html#test-discovery
-    """
-    def __init__(self, name, basedir="", method_prefix='test', **kwargs):
-        """
-        :param name: str, this is the testname that was passed in via the CLI
-        :param basedir: str, the directory to start searching
-        :param method_prefix: str, this is here because it is defined in
-            TestLoader, so it gets passed in here so TestLoader and this can
-            stay in sync
-        :param **kwargs:
-        """
-        self.name = name
-        if not basedir:
-            basedir = os.getcwd()
-        self.basedir = basedir
-        self.method_prefix = method_prefix
-        self.prefixes = kwargs.get("prefixes", [])
-        self.set_possible()
-
-    def raise_any_error(self):
-        """raise any found error in the possible PathFinders"""
-        for path_finder in self.possible:
-            path_finder.raise_found_error()
-
-    def get_any_error(self):
-        for path_finder in self.possible:
-            if exc_info := path_finder.get_found_error():
-                yield exc_info
-
-    def set_possible(self):
-        '''
-        break up a module path to its various parts (prefix, module, class,
-        method, etc)
-
-        this uses PEP 8 conventions, so foo.Bar would be foo module with class
-        Bar
-
-        :returns: list[PathFinder], a list of possible interpretations of the
-            module path (eg, foo.bar can be bar module in foo module,
-            or bar method in foo module)
-        '''
-        possible = []
-        name = self.name
-        basedir = self.basedir
-        method_prefix = self.method_prefix
-        prefixes = self.prefixes
-
-        logger.debug('Guessing test name: {}'.format(name))
-
-        name_f = self.name.lower()
-        filepath = ""
-        if name_f.endswith(".py") or ".py:" in name_f:
-            # path/something:Class.method
-            bits = name.split(":", 1)
-            filepath = bits[0]
-            logger.debug('Found filepath: {}'.format(filepath))
-
-            name = bits[1] if len(bits) > 1 else ""
-            if name:
-                logger.debug('Found test name: {} for filepath: {}'.format(
-                    name,
-                    filepath
-                ))
-
-        # https://github.com/Jaymon/pyt/issues/41
-        if m := re.match(r"(\S+)\s+\(([^\)]+)\)", name):
-            name = "{}.{}".format(m.group(2), m.group(1))
-
-        if ":" in name:
-            logger.debug('Found standard python path: {}'.format(name))
-
-            pfkwargs = {
-                "filepath": filepath
-            }
-
-            modpath, classpath = name.split(":", 1)
-
-            modparts = modpath.rsplit(".", 1)
-            if len(modparts) == 1:
-                pfkwargs["module_name"] = modparts[0]
-
-            else:
-                pfkwargs["prefix"] = modparts[0]
-                pfkwargs["module_name"] = modparts[1]
-
-            classparts = classpath.split(".", 1)
-            if len(classparts) == 1:
-                if classparts[0][0].isupper():
-                    pfkwargs["class_name"] = classparts[0]
-
-                else:
-                    pfkwargs["method_name"] = classparts[0]
-
-            else:
-                pfkwargs["class_name"] = classparts[0]
-                pfkwargs["method_name"] = classparts[1]
-
-            possible.append(
-                PathFinder(
-                    basedir,
-                    method_prefix,
-                    prefixes=prefixes,
-                    **pfkwargs
-                )
-            )
-
-        else:
-            bits = name.split('.')
-
-            # check if the last bit is a Class
-            if re.search(r'^\*?[A-Z]', bits[-1]):
-                logger.debug('Found classname: {}'.format(bits[-1]))
-                possible.append(
-                    PathFinder(
-                        basedir,
-                        method_prefix,
-                        **{
-                            'class_name': bits[-1],
-                            'module_name': bits[-2] if len(bits) > 1 else '',
-                            'prefix': os.sep.join(bits[0:-2]),
-                            'filepath': filepath,
-                            "prefixes": prefixes,
-                        }
-                    )
-                )
-
-            elif len(bits) > 1 and re.search(r'^\*?[A-Z]', bits[-2]):
-                logger.debug('Found classname: {}'.format(bits[-2]))
-                possible.append(
-                    PathFinder(
-                        basedir,
-                        method_prefix,
-                        **{
-                            'class_name': bits[-2],
-                            'method_name': bits[-1],
-                            'module_name': bits[-3] if len(bits) > 2 else '',
-                            'prefix': os.sep.join(bits[0:-3]),
-                            'filepath': filepath,
-                            "prefixes": prefixes,
-                        }
-                    )
-                )
-
-            else:
-                if self.name:
-                    if filepath:
-                        if len(bits):
-                            possible.append(
-                                PathFinder(
-                                    basedir,
-                                    method_prefix,
-                                    **{
-                                        'filepath': filepath,
-                                        'method_name': bits[0],
-                                        "prefixes": prefixes,
-                                    }
-                                )
-                            )
-
-                        else:
-                            possible.append(
-                                PathFinder(
-                                    basedir,
-                                    method_prefix,
-                                    **{
-                                        'filepath': filepath,
-                                        "prefixes": prefixes,
-                                    }
-                                )
-                            )
-
-                    else:
-                        logger.debug('Test name is ambiguous')
-                        possible.append(
-                            PathFinder(
-                                basedir,
-                                method_prefix,
-                                **{
-                                    'module_name': bits[-1],
-                                    'prefix': os.sep.join(bits[0:-1]),
-                                    'filepath': filepath,
-                                    "prefixes": prefixes,
-                                }
-                            )
-                        )
-                        possible.append(
-                            PathFinder(
-                                basedir,
-                                method_prefix,
-                                **{
-                                    'method_name': bits[-1],
-                                    'module_name': bits[-2] if len(bits) > 1 else '',
-                                    'prefix': os.sep.join(bits[0:-2]),
-                                    'filepath': filepath,
-                                    "prefixes": prefixes,
-                                }
-                            )
-                        )
-                        possible.append(
-                            PathFinder(
-                                basedir,
-                                method_prefix,
-                                **{
-                                    'prefix': os.sep.join(bits),
-                                    'filepath': filepath,
-                                    "prefixes": prefixes,
-                                }
-                            )
-                        )
-
-                else:
-                    possible.append(
-                        PathFinder(
-                            basedir,
-                            method_prefix,
-                            filepath=filepath,
-                            prefixes=prefixes,
-                        )
-                    )
-
-        logger.debug("Found {} possible test names".format(len(possible)))
-        self.possible = possible
-
-
 class PathFinder(object):
     """Pathfinder class
 
@@ -285,15 +53,21 @@ class PathFinder(object):
     might be and creates instances of this class, those instances then actually
     validate the guesses and allow the tests to be loaded or not
     """
-    def __init__(self, basedir, method_prefix='test', **kwargs):
+    def __init__(self, basedir, **kwargs):
         """
         :param basedir: str, the directory to start searching
-        :param method_prefix: str, passed in because TestLoader defines this so
-            it is passed in to make sure this stays in sync
         :param **kwargs:
+            * method_prefix: str, passed in because TestLoader defines this so
+                it is passed in to make sure this stays in sync
+            * prefix: str, if given foo.bar.che then prefix will be foo/bar
+            * module_name: str, if given foo.bar.che then module_name is che
+            * class_name: str, the test class name to find
+            * method_name: str, the test method name to find
+            * filepath: str, if instead of a python class path you pass in an
+                actual file path then it will be here
         """
         self.basedir = basedir
-        self.method_prefix = method_prefix
+        self.method_prefix = kwargs.get("method_prefix", "test")
         self.module_prefixes = ["test_", "test"]
         self.module_postfixes = ["_test", "test", "_tests", "tests"]
         for k, v in kwargs.items():
@@ -813,6 +587,236 @@ class PathFinder(object):
             "Module path {} found at filepath {}".format(module_name, filepath)
         )
         return module_name
+
+
+class PathGuesser(object):
+    """PathGuesser
+
+    This class compiles the possible paths, it is created in the TestLoader and
+    then the .possible attribute are iterated to actually load the tests.
+
+    The .possible property consists of PathFinder objects
+
+    https://docs.python.org/3/library/unittest.html#test-discovery
+    """
+    finder_class = PathFinder
+
+    def __init__(self, name, basedir="", **kwargs):
+        """
+        :param name: str, this is the testname that was passed in via the CLI
+            see .set_possible for how this is used, it has a few different
+            formats:
+                * <FILEPATH>:<CLASSNAME>.<METHOD_NAME>
+                * <MODULE_PREFIX>.<MODULE_NAME>[:.]<CLASS_NAME>.<METHOD_NAME>
+                * <METHOD_NAME> (<MODULE_PREFIX>.<MODULE_NAME>.<CLASS_NAME>)
+        :param basedir: str, the directory to start searching
+        :param **kwargs:
+            * method_prefix: str, this is here because it is defined in
+                TestLoader, so it gets passed in here so TestLoader and this can
+                stay in sync
+            * prefixes: list[str], passed in from PYT_PREFIX or --prefix flag,
+                these are the only prefixes that should be checked, see
+                .create_finder
+        """
+        self.name = name
+
+        if not basedir:
+            basedir = os.getcwd()
+        self.basedir = basedir
+
+        self.method_prefix = kwargs.get("method_prefix", "test")
+        self.prefixes = kwargs.get("prefixes", [])
+
+        self.set_possible()
+
+    def raise_any_error(self):
+        """raise any found error in the possible PathFinders"""
+        for path_finder in self.possible:
+            path_finder.raise_found_error()
+
+    def get_any_error(self):
+        for path_finder in self.possible:
+            if exc_info := path_finder.get_found_error():
+                yield exc_info
+
+    def create_finders(self, **kwargs):
+        if self.prefixes:
+            pout.i(self.prefixes)
+            for prefix in self.prefixes:
+                if prefix:
+                    if not kwargs.get("filepath", ""):
+                        parts = re.split(r"[\.\/\\]", prefix)
+
+                        if module_prefix := kwargs.get("prefix", ""):
+                            if not module_prefix.startswith(parts[0]):
+                                logger.debug(
+                                    f"Adding {prefix} to prefix"
+                                )
+                                kwargs["prefix"] = "{}{}{}".format(
+                                    os.sep.join(parts),
+                                    os.sep,
+                                    module_prefix
+                                )
+
+                        elif module_name := kwargs.get("module_name", ""):
+                            if not module_name.startswith(parts[0]):
+                                logger.debug(
+                                    f"Adding {prefix} as prefix"
+                                )
+                                kwargs["prefix"] = os.sep.join(parts)
+
+                        else:
+                            logger.debug(
+                                f"Adding {prefix} as prefix"
+                            )
+                            kwargs["prefix"] = os.sep.join(parts)
+
+                yield self.finder_class(
+                    self.basedir,
+                    method_prefix=self.method_prefix,
+                    **kwargs
+                )
+
+        else:
+            yield self.finder_class(
+                self.basedir,
+                method_prefix=self.method_prefix,
+                **kwargs
+            )
+
+    def set_possible(self):
+        '''
+        break up a module path to its various parts (prefix, module, class,
+        method, etc)
+
+        this uses PEP 8 conventions, so foo.Bar would be foo module with class
+        Bar.
+
+        sets .possible (list[PathFinder]), a list of possible interpretations of
+        the module path (eg, foo.bar can be bar module in foo module, or bar
+        method in foo module)
+        '''
+        possible = []
+        name = self.name
+
+        logger.debug('Guessing test name: {}'.format(name))
+
+        name_f = self.name.lower()
+        filepath = ""
+        if name_f.endswith(".py") or ".py:" in name_f:
+            # path/something:Class.method
+            bits = name.split(":", 1)
+            filepath = bits[0]
+            logger.debug('Found filepath: {}'.format(filepath))
+
+            name = bits[1] if len(bits) > 1 else ""
+            if name:
+                logger.debug('Found test name: {} for filepath: {}'.format(
+                    name,
+                    filepath
+                ))
+
+        # https://github.com/Jaymon/pyt/issues/41
+        if m := re.match(r"(\S+)\s+\(([^\)]+)\)", name):
+            name = "{}.{}".format(m.group(2), m.group(1))
+
+        if ":" in name:
+            logger.debug('Found standard python path: {}'.format(name))
+
+            pfkwargs = {
+                "filepath": filepath
+            }
+
+            modpath, classpath = name.split(":", 1)
+
+            modparts = modpath.rsplit(".", 1)
+            if len(modparts) == 1:
+                pfkwargs["module_name"] = modparts[0]
+
+            else:
+                pfkwargs["prefix"] = modparts[0]
+                pfkwargs["module_name"] = modparts[1]
+
+            classparts = classpath.split(".", 1)
+            if len(classparts) == 1:
+                if classparts[0][0].isupper():
+                    pfkwargs["class_name"] = classparts[0]
+
+                else:
+                    pfkwargs["method_name"] = classparts[0]
+
+            else:
+                pfkwargs["class_name"] = classparts[0]
+                pfkwargs["method_name"] = classparts[1]
+
+            possible.extend(self.create_finders(**pfkwargs))
+
+        else:
+            bits = name.split('.')
+
+            # check if the last bit is a Class
+            if re.search(r'^\*?[A-Z]', bits[-1]):
+                logger.debug('Found classname: {}'.format(bits[-1]))
+
+                possible.extend(self.create_finders(
+                    class_name=bits[-1],
+                    module_name=bits[-2] if len(bits) > 1 else '',
+                    prefix=os.sep.join(bits[0:-2]),
+                    filepath=filepath,
+                ))
+
+            elif len(bits) > 1 and re.search(r'^\*?[A-Z]', bits[-2]):
+                logger.debug('Found classname: {}'.format(bits[-2]))
+
+                possible.extend(self.create_finders(
+                    class_name=bits[-2],
+                    method_name=bits[-1],
+                    module_name=bits[-3] if len(bits) > 2 else '',
+                    prefix=os.sep.join(bits[0:-3]),
+                    filepath=filepath,
+                ))
+
+            else:
+                if name:
+                    if filepath:
+                        if len(bits):
+                            possible.extend(self.create_finders(
+                                filepath=filepath,
+                                method_name=bits[0],
+                            ))
+
+                        else:
+                            possible.extend(self.create_finders(
+                                filepath=filepath,
+                            ))
+
+                    else:
+                        logger.debug('Test name is ambiguous')
+                        possible.extend(self.create_finders(
+                            module_name=bits[-1],
+                            prefix=os.sep.join(bits[0:-1]),
+                            filepath=filepath,
+                        ))
+
+                        possible.extend(self.create_finders(
+                            method_name=bits[-1],
+                            module_name=bits[-2] if len(bits) > 1 else '',
+                            prefix=os.sep.join(bits[0:-2]),
+                            filepath=filepath,
+                        ))
+
+                        possible.extend(self.create_finders(
+                            prefix=os.sep.join(bits),
+                            filepath=filepath,
+                        ))
+
+                else:
+                    possible.extend(self.create_finders(
+                        filepath=filepath,
+                    ))
+
+        logger.debug("Found {} possible test names".format(len(possible)))
+        self.possible = possible
 
 
 # !!! Ripped from pout.path

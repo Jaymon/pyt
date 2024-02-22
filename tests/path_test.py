@@ -482,6 +482,41 @@ class PathGuesserTest(TestCase):
 
         m.client.run("test_foo ({})".format(m.name))
 
+    def test_prefixes(self):
+        """
+        https://github.com/Jaymon/pyt/issues/44
+        """
+        m = TestModule([
+            "class FooTest(TestCase):",
+            "    def test_bar(self):",
+            "        pass",
+        ])
+
+        pg = PathGuesser("", prefixes=[m.prefix])
+        pf = list(pg.create_finders(
+            module_name=m.prefix,
+        ))[0]
+        self.assertEqual(m.prefix, pf.module_name)
+        self.assertEqual("", getattr(pf, "prefix", ""))
+
+        pg = PathGuesser("", prefixes=[m.prefix])
+        pf = list(pg.create_finders(
+            filepath=m.path,
+            class_name="Foo"
+        ))[0]
+        self.assertEqual("", getattr(pf, "prefix", ""))
+
+        pg = PathGuesser("", prefixes=[m.prefix])
+        pf = list(pg.create_finders(
+            module_name=m.module_name,
+            prefix=m.prefix,
+        ))[0]
+        self.assertEqual(m.prefix, pf.prefix)
+
+        pg = PathGuesser("", prefixes=[m.prefix])
+        pf = list(pg.create_finders())[0]
+        self.assertEqual(m.prefix, pf.prefix)
+
 
 class RerunFileTest(TestCase):
     def test_rerun(self):
