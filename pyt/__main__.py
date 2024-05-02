@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import sys
-import platform
-import argparse
 import os
 
-from pyt import tester, __version__, main
+from pyt import main
 from pyt.compat import *
 
 
