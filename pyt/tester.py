@@ -1,22 +1,23 @@
 # -*- coding: utf-8 -*-
 import os
 from unittest import (
-    TestLoader as BaseTestLoader,
-    TextTestRunner as BaseTestRunner,
-    TextTestResult as BaseTestResult,
-    TestSuite as BaseTestSuite,
+    TestLoader,
+    TextTestRunner,
+    TextTestResult,
+    TestSuite,
     TestCase
 )
-from unittest.main import TestProgram as BaseTestProgram
+from unittest.main import TestProgram
 import time
 import logging
 import argparse
 import sys
 import platform
 import warnings
+import itertools
 
 from .compat import *
-from .utils import testpath, classpath, chain, loghandler_members, modname
+from .utils import testpath, classpath, loghandler_members, modname
 from .environ import TestEnviron
 from .path import PathGuesser, PathFinder, RerunFile
 
@@ -24,7 +25,7 @@ from .path import PathGuesser, PathFinder, RerunFile
 logger = logging.getLogger(__name__)
 
 
-class TestSuite(BaseTestSuite):
+class TestSuite(TestSuite):
     """
     We override the suite so classes that begin with an underscore will be
     filtered out from running, this allows us to easily create base TestCase
@@ -70,9 +71,9 @@ class TestSuite(BaseTestSuite):
         return super().run(result, *args, **kwargs)
 
 
-class TestLoader(BaseTestLoader):
-    """This custom loader acts as the translation layer from the cli to our path
-    guessing and finding classes
+class TestLoader(TestLoader):
+    """This custom loader acts as the translation layer from the cli to our
+    path guessing and finding classes
 
     https://docs.python.org/2/library/unittest.html#unittest.TestLoader
     https://github.com/python/cpython/blob/3.7/Lib/unittest/loader.py
@@ -144,7 +145,7 @@ class TestLoader(BaseTestLoader):
         return ts
 
 
-class TestResult(BaseTestResult):
+class TestResult(TextTestResult):
     """
     https://github.com/python/cpython/blob/3.7/Lib/unittest/result.py
     """
@@ -234,7 +235,7 @@ class TestResult(BaseTestResult):
         super()._restoreStdout()
 
 
-class TestRunner(BaseTestRunner):
+class TestRunner(TextTestRunner):
     """
     https://docs.python.org/3/library/unittest.html#unittest.TextTestRunner
     https://github.com/python/cpython/blob/3.7/Lib/unittest/runner.py
@@ -259,7 +260,13 @@ class TestRunner(BaseTestRunner):
                     self.stream.writeln(
                         "Failed or errored {} tests:".format(count)
                     )
-                    for testcase, failure in chain(result.errors, result.failures):
+
+#                     failed_tests = chain(result.errors, result.failures)
+#                     for testcase, failure in failed_tests:
+                    for testcase, failure in itertools.chain(
+                        result.errors,
+                        result.failures
+                    ):
                         tp = testpath(testcase)
                         self.stream.writeln(tp)
                         fp.writeln(tp)
@@ -276,7 +283,7 @@ class TestRunner(BaseTestRunner):
         return result
 
 
-class TestProgram(BaseTestProgram):
+class TestProgram(TestProgram):
     """The main entrypoint into the module, this is where everything starts
 
     https://docs.python.org/3/library/unittest.html#unittest.main
@@ -303,8 +310,8 @@ class TestProgram(BaseTestProgram):
             # https://docs.python.org/3/library/logging.html#logging.Logger.propagate
             #
             # we turn off propogation for pyt loggers because without this if
-            # the tests that get loaded configured logging (which I commonly do)
-            # then pyt would start double printing everything
+            # the tests that get loaded configured logging (which I commonly
+            # do) then pyt would start double printing everything
             logger.propagate = False
 
         if v < 2:
@@ -317,8 +324,8 @@ class TestProgram(BaseTestProgram):
         self.environ = TestEnviron()
 
         # according to the code, testLoader gets defaulted to
-        # unittest.loader.defaultTestLoader which is an instance, so to override
-        # it we should pass in our loader as an instance also
+        # unittest.loader.defaultTestLoader which is an instance, so to
+        # override it we should pass in our loader as an instance also
         testloader = TestLoader()
         # we want to keep open the possibility of grabbing values from this
         # later on down the line
@@ -345,7 +352,7 @@ class TestProgram(BaseTestProgram):
         that method calls this method or ._do_discovery
         """
         # if we didn't pass in any test names then we want to find all tests
-        if not self.tests and self.rerun:
+        if not self.tests and self.rerun_failed_tests:
             self.testNames = list(RerunFile())
 
         # we need to set .testNames to anything but None to short circuit
@@ -378,7 +385,7 @@ class TestProgram(BaseTestProgram):
 
         parser.add_argument(
             "--version", "-V",
-            action='version',
+            action="version",
             version="%(prog)s {}, Python {} ({})".format(
                 __version__,
                 platform.python_version(),
@@ -388,26 +395,27 @@ class TestProgram(BaseTestProgram):
 
         # https://docs.python.org/2/library/warnings.html
         parser.add_argument(
-            '--warnings', "--warning", "-w", "-W",
-            dest='warnings',
-            action='store_const',
+            "--warnings", "--warning", "-w", "-W",
+            dest="warnings",
+            action="store_const",
             const="error",
             default="",
-            help='Converts warnings into errors'
+            help="Converts warnings into errors"
         )
 
         parser.add_argument(
-            '--debug', '-d',
-            dest='verbosity',
-            action='store_const',
+            "--debug", "-d",
+            dest="verbosity",
+            action="store_const",
             const=2,
-            help='Verbose output'
+            help="Verbose output"
         )
 
         parser.add_argument(
             '--rerun',
-            action='store_true',
-            help='Rerun previously failed tests'
+            dest="rerun_failed_tests",
+            action="store_true",
+            help="Rerun previously failed tests"
         )
 
         parser.add_argument(

@@ -2,7 +2,6 @@
 import re
 from unittest.util import strclass
 from unittest import TestCase
-import itertools
 import logging
 import inspect
 from collections import namedtuple
@@ -45,20 +44,6 @@ def classpath(v):
         ret = strclass(v.__class__)
 
     return ret
-
-
-def chain(*sequences):
-    """wrapper around itertools.chain
-
-    :param *sequences: one or more sequences (eg, list, tuple, iterator) that
-        you want to iterate through one right after another, if you pass in one
-        sequence it will be assumed to be a list of sequences
-    :returns: iterator, a generator that will work through each passed sequence
-    """
-    if len(sequences) == 1:
-        sequences = sequences[0]
-
-    return itertools.chain(*sequences)
 
 
 def modname():
