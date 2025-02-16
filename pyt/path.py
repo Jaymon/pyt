@@ -224,9 +224,9 @@ class PathFinder(object):
         :param basenames: list, a list of basenames to check
         :param is_prefix: bool, True if this is a prefix search, which means it
             will also check if name matches any of the basenames without the
-            prefixes or postfixes, if it is False then the prefixes or postfixes
-            must be present (ie, the module we're looking for is the actual test
-            module, not the parent modules it's contained in)
+            prefixes or postfixes, if it is False then the prefixes or
+            postfixes must be present (ie, the module we're looking for is the
+            actual test module, not the parent modules it's contained in)
         :returns: string, the basename if it is found
         """
         ret = ""
@@ -451,7 +451,10 @@ class PathFinder(object):
         :returns: generator, same as os.walk
         """
         system_d = SitePackagesDir()
-        filter_system_d = system_d and os.path.commonprefix([system_d, basedir]) != system_d
+        filter_system_d = (
+            system_d
+            and os.path.commonprefix([system_d, basedir]) != system_d
+        )
 
         for root, dirs, files in os.walk(basedir, topdown=True):
             # ignore dot directories and private directories (start with

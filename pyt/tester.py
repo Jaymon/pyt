@@ -43,16 +43,46 @@ class TestSuite(TestSuite):
         if add_it:
             super().addTest(test)
 
-    def __str__(self):
+#     def __str__(self):
+#         lines = []
+#         for test in self._tests:
+#             if isinstance(test, type(self)):
+#                 lines.append(str(test))
+# 
+#             else:
+#                 lines.append(testpath(test))
+# 
+#         return "\n".join(lines)
+
+    def get_method_names(self, depth=0, indent="\t"):
+        """Get all the test method names this suite represents in a
+        hierarchical listing
+
+        :param depth: int, how much `indent` should be applied
+        :param indent: str, the indentation characters, (indent * depth will
+            be the prefix placed on each line
+        :returns: str, the method names
+        """
         lines = []
+        has_method_names = False
+
+        if name := getattr(self, "name", ""):
+            lines.append((indent * depth) + name)
+            depth += 1
+
         for test in self._tests:
             if isinstance(test, type(self)):
-                lines.append(str(test))
+                if line := test.get_method_names(depth, indent):
+                    lines.append(line)
+                    has_method_names = True
 
             else:
-                lines.append(testpath(test))
+                if line := testpath(test):
+                    lines.append((indent * depth) + line)
+                    has_method_names = True
 
-        return "\n".join(lines)
+        #pout.v(lines, has_method_names)
+        return "\n".join(lines) if has_method_names else ""
 
     def run(self, result, *args, **kwargs):
         # we surface any PathGuesser errors here because this is one of the
@@ -103,7 +133,7 @@ class TestLoader(TestLoader):
         environ = program.environ
 
         ts.program = program
-        ts.path_guesser = pg = PathGuesser(
+        ts.path_guesser = PathGuesser(
             name,
             basedir=self._top_level_dir,
             method_prefix=self.testMethodPrefix,
@@ -111,9 +141,11 @@ class TestLoader(TestLoader):
         )
         found = False
 
-        logger.debug("Searching for tests in directory: {}".format(pg.basedir))
+        logger.debug(
+            f"Searching for tests in directory: {ts.path_guesser.basedir}"
+        )
 
-        for i, pf in enumerate(pg.possible, 1):
+        for i, pf in enumerate(ts.path_guesser.possible, 1):
             logger.debug("{}. Searching for tests matching: {}".format(i, pf))
             if pf.has_method():
                 for c, mn in pf.method_names():
@@ -121,7 +153,7 @@ class TestLoader(TestLoader):
                         'Found method test: {}'.format(testpath(c, mn))
                     )
                     found = True
-                    ts.addTest(c(mn))
+                    ts.addTest(self.loadTestsFromMethodName(c, mn))
                     environ.counter["methods"] += 1
 
             elif pf.has_class():
@@ -143,6 +175,22 @@ class TestLoader(TestLoader):
                     break
 
         return ts
+
+    def loadTestsFromModule(self, module, *args, **kwargs):
+        suite = super().loadTestsFromModule(module, *args, **kwargs)
+        suite.name = module.__name__
+        return suite
+
+    def loadTestsFromTestCase(self, testCaseClass):
+        suite = super().loadTestsFromTestCase(testCaseClass)
+        suite.name = f"{testCaseClass.__module__}.{testCaseClass.__qualname__}"
+        return suite
+
+    def loadTestsFromMethodName(self, testCaseClass, method_name):
+        suite = self.suiteClass([testCaseClass(method_name)])
+        suite.name = f"{testCaseClass.__module__}.{testCaseClass.__qualname__}"
+        return suite
+        #return testCaseClass(method_name)
 
 
 class TestResult(TextTestResult):
@@ -261,8 +309,6 @@ class TestRunner(TextTestRunner):
                         "Failed or errored {} tests:".format(count)
                     )
 
-#                     failed_tests = chain(result.errors, result.failures)
-#                     for testcase, failure in failed_tests:
                     for testcase, failure in itertools.chain(
                         result.errors,
                         result.failures
@@ -430,7 +476,42 @@ class TestProgram(TestProgram):
             )
         )
 
+#         class ListAction(argparse._StoreTrueAction):
+#             def __call__(self, parser, program, values, option_string=None):
+#                 pout.h()
+#                 pout.v(parser, program, values, option_string)
+
+#                 pg = PathGuesser(
+#                     name,
+#                     basedir=self._top_level_dir,
+#                     method_prefix=self.testMethodPrefix,
+#                     prefixes=program.prefixes
+#                 )
+
+# 
+#                 parser.exit()
+
+        parser.add_argument(
+            '--list', "-l",
+            dest="list_found_tests",
+            action="store_true",
+            #action=ListAction,
+            help="print out found tests"
+        )
+
         return parser
+
+    def runTests(self):
+        if self.list_found_tests:
+            testRunner = self.testRunner()
+            for suite in self.test._tests:
+                testRunner.stream.write(suite.get_method_names())
+
+            testRunner.stream.writeln("")
+            self._main_parser.exit()
+
+        else:
+            return super().runTests()
 
 
 main = TestProgram

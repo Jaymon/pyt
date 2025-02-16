@@ -21,6 +21,9 @@ for n, l in list(logging.Logger.manager.loggerDict.items()):
         l.name = new_n
         logging.Logger.manager.loggerDict.pop(n)
         logging.Logger.manager.loggerDict[new_n] = l
+for k in list(os.environ.keys()):
+    if k.startswith("PYT_"):
+        os.environ.pop(k)
 
 
 from pyt.compat import *
@@ -156,6 +159,6 @@ class TestModule(object):
             exit=False,
             **kwargs
         )
-        return r
 
+        return r
 

@@ -121,9 +121,9 @@ You can also get it directly from the repo:
 
 ## Testing
 
-Testing in 3.5 on MacOS:
+Testing on MacOS:
 
-    $ python3.10 -m unittest pyt_test
+    $ python -m unittest discover
 
 Or, if you're really brave, you can use `pyt` to test itself:
 

@@ -3,7 +3,6 @@ import sys
 
 import testdata
 
-from pyt.compat import unicode
 from pyt.tester import TestProgram
 from pyt import __version__
 from . import TestCase, TestModule
@@ -755,7 +754,7 @@ class TestLoaderTest(TestCase):
 
         tl = m.loader
         s = tl.loadTestsFromName("")
-        self.assertFalse("test_che" in unicode(s))
+        self.assertFalse("test_che" in str(s))
 
         m = TestModule(
             "from unittest import TestCase",
@@ -765,7 +764,7 @@ class TestLoaderTest(TestCase):
 
         tl = m.loader
         s = tl.loadTestsFromName("")
-        self.assertTrue("test_che" in unicode(s))
+        self.assertTrue("test_che" in str(s))
 
     def test_issue_30(self):
         """https://github.com/Jaymon/pyt/issues/30"""
@@ -781,7 +780,8 @@ class TestLoaderTest(TestCase):
 
         tl = m.loader
         s = tl.loadTestsFromName("model.che")
-        self.assertEqual("issuethirty_test.model_test.BarTest.test_che", unicode(s))
+        self.assertTrue("issuethirty_test.model_test.BarTest" in str(s))
+        self.assertTrue("testMethod=test_che" in str(s))
 
     def test_issue_32(self):
         """https://github.com/Jaymon/pyt/issues/32"""
@@ -799,7 +799,8 @@ class TestLoaderTest(TestCase):
         }, name="")
         tl = m.loader
         s = tl.loadTestsFromName("issuethirtytwo.Bar.che")
-        self.assertEqual("issuethirtytwo_test.BarTest.test_che", unicode(s))
+        self.assertTrue("issuethirtytwo_test.BarTest" in str(s))
+        self.assertTrue("testMethod=test_che" in str(s))
 
         m = TestModule({
             "issthirtytwotwo": [
@@ -815,7 +816,8 @@ class TestLoaderTest(TestCase):
         }, name="")
         tl = m.loader
         s = tl.loadTestsFromName("issthirtytwotwo.bar.Che.baz")
-        self.assertEqual("issthirtytwotwo_test.bar_test.CheTest.test_baz", unicode(s))
+        self.assertTrue("issthirtytwotwo_test.bar_test.CheTest" in str(s))
+        self.assertTrue("testMethod=test_baz" in str(s))
 
     def test_private_testcase(self):
         # https://github.com/Jaymon/pyt/issues/17
