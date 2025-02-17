@@ -43,17 +43,6 @@ class TestSuite(TestSuite):
         if add_it:
             super().addTest(test)
 
-#     def __str__(self):
-#         lines = []
-#         for test in self._tests:
-#             if isinstance(test, type(self)):
-#                 lines.append(str(test))
-# 
-#             else:
-#                 lines.append(testpath(test))
-# 
-#         return "\n".join(lines)
-
     def get_method_names(self, depth=0, indent="\t"):
         """Get all the test method names this suite represents in a
         hierarchical listing
@@ -81,7 +70,6 @@ class TestSuite(TestSuite):
                     lines.append((indent * depth) + line)
                     has_method_names = True
 
-        #pout.v(lines, has_method_names)
         return "\n".join(lines) if has_method_names else ""
 
     def run(self, result, *args, **kwargs):
@@ -190,7 +178,6 @@ class TestLoader(TestLoader):
         suite = self.suiteClass([testCaseClass(method_name)])
         suite.name = f"{testCaseClass.__module__}.{testCaseClass.__qualname__}"
         return suite
-        #return testCaseClass(method_name)
 
 
 class TestResult(TextTestResult):
@@ -367,22 +354,35 @@ class TestProgram(TestProgram):
             logger.setLevel(logging.DEBUG)
 
     def __init__(self, **kwargs):
-        self.environ = TestEnviron()
+        """Create a Pyt testing program
 
-        # according to the code, testLoader gets defaulted to
-        # unittest.loader.defaultTestLoader which is an instance, so to
-        # override it we should pass in our loader as an instance also
-        testloader = TestLoader()
-        # we want to keep open the possibility of grabbing values from this
-        # later on down the line
-        testloader.program = self
+        Any flags defined on the parent class can be passed into here
 
-        kwargs.setdefault("testLoader", testloader)
+        :keyword environ: TestEnviron, the testing environment
+        :keyword testLoader: TestLoader
+        :keyword testRunner: TestRunner
+        :keyword module: str, defaults to `pyt`, this should probably never
+            be messed with unless you know what you're doing because I'm not
+            even sure anymore why it is here and set to `pyt`, I know it is
+            used to get passed some parent `self.module is None` checks
+        """
+        self.environ = kwargs.pop("environ", TestEnviron())
 
-        # according to the code testRunner is defaulted to a None and set to a
+        if "testLoader" not in kwargs:
+            # according to the code, testLoader gets defaulted to
+            # unittest.loader.defaultTestLoader which is an instance, so to
+            # override it we should pass in our loader as an instance also
+            testloader = TestLoader()
+            # we want to keep open the possibility of grabbing values from this
+            # later on down the line
+            testloader.program = self
+
+            kwargs["testLoader"] = testloader
+
+        # according to the code testRunner is defaulted to None and set to a
         # class in .runTests, where an instance is then created, so there are
         # no hooks to customize creation of it, it does pass .test into its
-        # .run method though, so the hook will have to be there
+        # .run method though, so the customization hook will have to be there
         kwargs.setdefault("testRunner", TestRunner)
 
         # we want to get around all the .module is None checks
@@ -406,9 +406,9 @@ class TestProgram(TestProgram):
         if not self.testNames:
             self.testNames = []
 
-        # if no prefixes were passed in through the CLI then we'll use any
-        # environment defined prefixes
-        if not getattr(self, "prefixes", None):
+        # if the --prefix flag was used on the command line then ignore the
+        # environment prefixes
+        if not self.prefixes:
             self.prefixes = self.environ.get_prefixes()
 
         # TestLoader is used to load the tests and .test is set in parent's 
@@ -469,50 +469,39 @@ class TestProgram(TestProgram):
             dest="prefixes",
             action="append",
             default=[],
-            #default=self.environ.get_prefixes(),
             help=(
                 "The prefix(es)"
                 " (python module paths where TestCase subclasses are found)"
             )
         )
 
-#         class ListAction(argparse._StoreTrueAction):
-#             def __call__(self, parser, program, values, option_string=None):
-#                 pout.h()
-#                 pout.v(parser, program, values, option_string)
-
-#                 pg = PathGuesser(
-#                     name,
-#                     basedir=self._top_level_dir,
-#                     method_prefix=self.testMethodPrefix,
-#                     prefixes=program.prefixes
-#                 )
-
-# 
-#                 parser.exit()
-
         parser.add_argument(
-            '--list', "-l",
+            '--list', "-L",
             dest="list_found_tests",
             action="store_true",
-            #action=ListAction,
             help="print out found tests"
         )
 
         return parser
 
     def runTests(self):
+        """This is the final method, if .exit=True then this will even exit
+        the run when finished.
+
+        This is the best place to add functionality that needs the flags all
+        to be parsed but can interrupt the normal testing flow (like the
+        `--list` flag that is implemented in here
+        """
         if self.list_found_tests:
             testRunner = self.testRunner()
             for suite in self.test._tests:
                 testRunner.stream.write(suite.get_method_names())
 
             testRunner.stream.writeln("")
-            self._main_parser.exit()
+
+            if self.exit:
+                self._main_parser.exit()
 
         else:
             return super().runTests()
-
-
-main = TestProgram
 

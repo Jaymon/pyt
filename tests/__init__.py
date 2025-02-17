@@ -28,7 +28,7 @@ for k in list(os.environ.keys()):
 
 from pyt.compat import *
 from pyt.path import PathFinder, PathGuesser
-from pyt.tester import TestLoader, main, TestProgram
+from pyt.tester import TestLoader, TestProgram
 from pyt.environ import TestEnviron
 
 

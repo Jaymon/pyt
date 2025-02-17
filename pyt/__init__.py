@@ -13,10 +13,7 @@ import logging
 import sys
 
 
-from .tester import main # so you can do pyt.main like unittest.main
-
-
-__version__ = '1.2.0'
+__version__ = "1.2.0"
 
 
 def get_counts():
@@ -28,9 +25,9 @@ def get_counts():
     """
     counts = {}
     ks = [
-        ('PYT_TEST_CLASS_COUNT', "classes"),
-        ('PYT_TEST_COUNT', "tests"),
-        ('PYT_TEST_MODULE_COUNT', "modules"),
+        ("PYT_TEST_CLASS_COUNT", "classes"),
+        ("PYT_TEST_COUNT", "tests"),
+        ("PYT_TEST_MODULE_COUNT", "modules"),
     ]
 
     for ek, cn in ks:

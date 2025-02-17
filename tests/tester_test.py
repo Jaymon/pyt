@@ -483,10 +483,20 @@ class TestProgramTest(TestCase):
         self.assertTrue('test_handshake' in r)
 
         r = s.run(["--verbose", "test_handshake"])
-        self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
+        self.assertTrue(
+            (
+                "Found method test:"
+                " prefix_search.chebaz_test.BarTest.test_handshake"
+            ) in r
+        )
 
         r = s.run(["--verbose", "Bar.test_handshake"])
-        self.assertTrue('Found method test: prefix_search.chebaz_test.BarTest.test_handshake' in r)
+        self.assertTrue(
+            (
+                "Found method test:"
+                " prefix_search.chebaz_test.BarTest.test_handshake"
+            ) in r
+        )
 
         r = s.run(["--verbose", "che"])
         self.assertTrue('Found module test: prefix_search.chebaz_test' in r)
@@ -739,7 +749,8 @@ class TestProgramTest(TestCase):
 
 class TestLoaderTest(TestCase):
     def test_load_tests_protocol(self):
-        """load tests protocol is supported by default in py>=3.2 but not in py2
+        """load tests protocol is supported by default in py>=3.2 but not in
+        py2
         https://docs.python.org/2/library/unittest.html#load-tests-protocol
         https://docs.python.org/3/library/unittest.html#load-tests-protocol
         """
@@ -945,5 +956,4 @@ class TestLoaderTest(TestCase):
 
         s = tl.loadTestsFromName('{}.foo'.format(m.name))
         self.assertTrue('test_foo' in str(s))
-
 
