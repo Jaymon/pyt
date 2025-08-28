@@ -30,7 +30,7 @@ tests = [
 ]
 
 [project.scripts]
-pyt = "pyt.__main__:console"
+pyt = "pyt.__main__:main"
 
 [build-system]
 requires = [
