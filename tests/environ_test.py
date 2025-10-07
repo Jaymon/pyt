@@ -59,8 +59,8 @@ class EnvironTest(TestCase):
 
         # running one class
         r = c.run(["--verbose", "bar.Bar"])
-        self.assertTrue("test_one ({}.bar_test.BarTest)".format(m.name) in r)
-        self.assertTrue("test_two ({}.bar_test.BarTest)".format(m.name) in r)
+        self.assertTrue("test_one ({}.bar_test.BarTest".format(m.name) in r)
+        self.assertTrue("test_two ({}.bar_test.BarTest".format(m.name) in r)
         self.assertTrue("Ran 2 tests" in r)
 
         # running modules
@@ -75,9 +75,8 @@ class EnvironTest(TestCase):
 
         # running one module
         r = c.run(["--verbose", "bar"])
-        self.assertTrue("test_one ({}.bar_test.BarTest)".format(m.name) in r)
-        self.assertTrue("test_two ({}.bar_test.BarTest)".format(m.name) in r)
+        self.assertTrue("test_one ({}.bar_test.BarTest".format(m.name) in r)
+        self.assertTrue("test_two ({}.bar_test.BarTest".format(m.name) in r)
         self.assertTrue("Ran 2 tests" in r)
         self.assertTrue("skipped=1" in r)
-
 

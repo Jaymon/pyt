@@ -157,11 +157,11 @@ class TestProgramTest(TestCase):
         self.assertEqual(0, len(r.result.errors))
 
         r = s.run(["--verbose", "--buffer", "Buffer4.success"])
-        self.assertTrue("test_success_1 ({}.Buffer4)".format(m.name) in r)
-        self.assertTrue("test_success_2 ({}.Buffer4)".format(m.name) in r)
+        self.assertTrue("test_success_1 ({}.Buffer4".format(m.name) in r)
+        self.assertTrue("test_success_2 ({}.Buffer4".format(m.name) in r)
 
         r = s.run(["--verbose", "--buffer", "Buffer4.success_1"])
-        self.assertTrue("test_success_1 ({}.Buffer4)".format(m.name) in r)
+        self.assertTrue("test_success_1 ({}.Buffer4".format(m.name) in r)
         self.assertFalse("*success stdout*" in r)
         self.assertFalse("*success stderr*" in r)
         self.assertFalse("*success stderr logger*" in r)
@@ -255,7 +255,9 @@ class TestProgramTest(TestCase):
         ])
         s = m.client
 
-        r = s.run(["--verbose", "{}:Bah".format(m.path)])
+        # 0 - python <3.12
+        # 5 - python >=3.12
+        r = s.run(["--verbose", "{}:Bah".format(m.path)], code=[0, 5])
         self.assertTrue("Ran 0 tests" in r)
 
         r = s.run(["--verbose", m.path])
@@ -306,7 +308,9 @@ class TestProgramTest(TestCase):
         })
         s = m.client
 
-        ret_code = s.run('PEFoo.bar', code=1)
+        # 1 - python <3.12
+        # 5 - python >=3.12
+        ret_code = s.run('PEFoo.bar', code=[1, 5])
 
     def test_parse_error_2(self):
         m = TestModule(
@@ -316,7 +320,9 @@ class TestProgramTest(TestCase):
         )
         s = m.client
 
-        r = s.run(m.name, code=1)
+        # 1 - python <3.12
+        # 5 - python >=3.12
+        r = s.run(m.name, code=[1, 5])
 
     def test_testcase_not_found(self):
         """ https://github.com/Jaymon/pyt/issues/1 """
@@ -328,7 +334,7 @@ class TestProgramTest(TestCase):
         s = m.client
 
         r = s.run(["--verbose", "{}.BARTest.test_che".format(m.name)])
-        self.assertTrue('test_che ({}.BARTest)'.format(m.name) in r)
+        self.assertTrue('test_che ({}.BARTest'.format(m.name) in r)
 
     def test_error_print_on_failure(self):
         """tests weren't printing errors even on total failure, this makes sure
@@ -338,7 +344,9 @@ class TestProgramTest(TestCase):
         )
         s = m.client
 
-        r = s.run("", code=1)
+        # 1 - python <3.12
+        # 5 - python >=3.12
+        r = s.run("", code=[1, 5])
         self.assertTrue(len(r) > 0)
 
     def test_failfast_1(self):
@@ -417,7 +425,9 @@ class TestProgramTest(TestCase):
             "raise ValueError('foo')"
         )
         s = m.client
-        s.run(m.name_prefix, code=1)
+        # 1 - python <3.12
+        # 5 - python >=3.12
+        s.run(m.name_prefix, code=[1, 5])
 
     def test_cli_run(self):
         m = TestModule(
@@ -430,7 +440,9 @@ class TestProgramTest(TestCase):
         r = s.run(["--verbose", m.name_prefix])
         self.assertTrue("Ran 1 test")
 
-        r = s.run(["--verbose", "blah.blarg.blorg"])
+        # 0 - python <3.12
+        # 5 - python >=3.12
+        r = s.run(["--verbose", "blah.blarg.blorg"], code=[0, 5])
         self.assertTrue("Ran 0 tests")
 
     def test_found_module_ignore_method(self):
@@ -501,7 +513,9 @@ class TestProgramTest(TestCase):
         r = s.run(["--verbose", "che"])
         self.assertTrue('Found module test: prefix_search.chebaz_test' in r)
 
-        r = s.run(["--verbose", "baz"])
+        # 0 - python <3.12
+        # 5 - python >=3.12
+        r = s.run(["--verbose", "baz"], code=[0, 5])
         self.assertTrue('Ran 0 tests' in r)
 
         r = s.run(["Bar.handshake", "--debug"])
@@ -650,7 +664,9 @@ class TestProgramTest(TestCase):
         self.assertTrue("Ran 1 test" in r)
         self.assertTrue("errors=1" in r)
 
-        r = m.client.run("-f", retcode=1)
+        # 0 - python <3.12
+        # 5 - python >=3.12
+        r = m.client.run("-f", retcode=[1, 5])
         self.assertTrue("Ran 0 tests" in r)
         self.assertTrue("errors=1" in r)
 
@@ -692,7 +708,9 @@ class TestProgramTest(TestCase):
             "        self.assertEqual(1, 1)",
             "",
         ])
-        r = m.client.run([m.name, "-d"], code=1)
+        # 1 - python <3.12
+        # 5 - python >=3.12
+        r = m.client.run([m.name, "-d"], code=[1, 5])
         self.assertTrue("Failed or errored 1 tests" in r)
         self.assertFalse("_ErrorLoader" in r)
 

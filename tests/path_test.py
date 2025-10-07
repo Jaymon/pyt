@@ -321,7 +321,7 @@ class PathFinderTest(TestCase):
             name="tests.foo.bar_test"
         )
         r = m.client.run(["-d", "foo.bar.che"])
-        self.assertTrue("test_che (tests.foo.bar_test.BarTest)" in r)
+        self.assertTrue("test_che (tests.foo.bar_test.BarTest" in r)
         self.assertTrue("Ran 1 test" in r)
 
 
