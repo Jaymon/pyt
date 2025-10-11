@@ -9,6 +9,7 @@ import logging
 import hashlib
 import site
 import tempfile
+import glob
 
 from .compat import *
 from .utils import modname
@@ -231,9 +232,9 @@ class PathFinder(object):
         """
         ret = ""
         fileroots = [(os.path.splitext(n)[0], n) for n in basenames]
-        glob = False
+        has_glob = False
         if name.startswith("*"):
-            glob = True
+            has_glob = True
         name = name.strip("*")
 
         for fileroot, basename in fileroots:
@@ -245,7 +246,7 @@ class PathFinder(object):
                         name,
                         pf
                     ))
-                    if glob:
+                    if has_glob:
                         if name in fileroot and fileroot.endswith(pf):
                             ret = basename
                             break
@@ -263,7 +264,7 @@ class PathFinder(object):
                                 n
                             )
                         )
-                        if glob:
+                        if has_glob:
                             if fileroot.startswith(pf) and name in fileroot:
                                 ret = basename
                                 break
@@ -280,7 +281,7 @@ class PathFinder(object):
                                 name
                             )
                         )
-                        if basename.startswith(name) or (glob and name in basename):
+                        if basename.startswith(name) or (has_glob and name in basename):
                             ret = basename
 
                         else:
@@ -289,7 +290,7 @@ class PathFinder(object):
                                 basename,
                                 name
                             ))
-                            if glob:
+                            if has_glob:
                                 if name in basename and self._is_module_path(basename):
                                     ret = basename
 
@@ -319,6 +320,7 @@ class PathFinder(object):
                         "Checking {} for modname {}".format(root2, modname)
                     )
                     ret = ""
+
                     basename = self._find_basename(
                         modname,
                         dirs2,
@@ -490,7 +492,6 @@ class PathFinder(object):
         else:
             if module_prefix:
                 basedirs = self._find_prefix_paths(self.basedir, module_prefix)
-
             else:
                 basedirs = [self.basedir]
 
@@ -526,7 +527,10 @@ class PathFinder(object):
                                     fileroot = os.path.splitext(basename)[0]
                                     for pf in self.module_postfixes:
                                         if fileroot.endswith(pf):
-                                            filepath = os.path.join(root, basename)
+                                            filepath = os.path.join(
+                                                root,
+                                                basename
+                                            )
                                             if filepath not in seen_paths:
                                                 logger.debug(
                                                     'Module postfix path: {}'.format(
@@ -538,7 +542,10 @@ class PathFinder(object):
 
                                     for pf in self.module_prefixes:
                                         if fileroot.startswith(pf):
-                                            filepath = os.path.join(root, basename)
+                                            filepath = os.path.join(
+                                                root,
+                                                basename
+                                            )
                                             if filepath not in seen_paths:
                                                 logger.debug(
                                                     'Module prefix path: {}'.format(
@@ -553,9 +560,16 @@ class PathFinder(object):
                     logger.warning(e, exc_info=True)
                     pass
 
+#             else:
+#                 if module_prefix:
+#                     # we found no paths so check if prefix is actually a file
+#                     path = os.path.join(self.basedir, f"{module_prefix}.py")
+#                     if os.path.isfile(path):
+#                         yield path
+
     def module_path(self, filepath):
-        """given a filepath like /base/path/to/module.py this will convert it to
-        path.to.module so it can be imported"""
+        """given a filepath like /base/path/to/module.py this will convert it
+        to path.to.module so it can be imported"""
         possible_modbits = re.split('[\\/]', filepath.strip('\\/'))
         basename = possible_modbits[-1]
         prefixes = possible_modbits[0:-1]
@@ -615,8 +629,8 @@ class PathGuesser(object):
         :param basedir: str, the directory to start searching
         :param **kwargs:
             * method_prefix: str, this is here because it is defined in
-                TestLoader, so it gets passed in here so TestLoader and this can
-                stay in sync
+                TestLoader, so it gets passed in here so TestLoader and this
+                can stay in sync
             * prefixes: list[str], passed in from PYT_PREFIX or --prefix flag,
                 these are the only prefixes that should be checked, see
                 .create_finder
@@ -652,7 +666,7 @@ class PathGuesser(object):
                         if module_prefix := kwargs.get("prefix", ""):
                             if not module_prefix.startswith(parts[0]):
                                 logger.debug(
-                                    f"Adding {prefix} to prefix"
+                                    f"Adding {prefix} for module prefix"
                                 )
                                 kwargs["prefix"] = "{}{}{}".format(
                                     os.sep.join(parts),
@@ -663,7 +677,7 @@ class PathGuesser(object):
                         elif module_name := kwargs.get("module_name", ""):
                             if not module_name.startswith(parts[0]):
                                 logger.debug(
-                                    f"Adding {prefix} as prefix"
+                                    f"Adding {prefix} for module name"
                                 )
                                 kwargs["prefix"] = os.sep.join(parts)
 
@@ -703,7 +717,39 @@ class PathGuesser(object):
 
         logger.debug('Guessing test name: {}'.format(name))
 
-        name_f = self.name.lower()
+        # find potential filepaths using the the name and prefix
+        filepaths = []
+        if name:
+            filepaths.append(name)
+
+        if self.prefixes:
+            for prefix in self.prefixes:
+                filepaths.append(prefix)
+                if name:
+                    filepaths.append(os.path.join(prefix, name))
+
+        # unittest.TestProgram strips .py from passed in test names (eg,
+        # `foo_test.py` would become `foo_test`) so we need to add the .py back
+        # and check if it is a valid filepath, otherwise it will get missed.
+        # This check will fail on case-sensitive filesystems if the name or
+        # extension has uppercase characters
+        name_f = name.lower()
+        for fp in filepaths:
+            for gfp in glob.glob(f"{fp}.py", recursive=False):
+                name_f = gfp
+                name = name_f
+                break
+
+        # unittest.TestProgram strips .py from passed in test names (eg,
+        # `foo_test.py` would become `foo_test`) so we need to add the .py back
+        # and check if it is a valid filepath, otherwise it will get missed.
+        # This check will fail on case-sensitive filesystems if the name or
+        # extension has uppercase characters
+#         if os.path.isfile(f"{name_f}.py"):
+#             name_f = f"{name_f}.py"
+# 
+#         pout.v(self)
+
         filepath = ""
         if name_f.endswith(".py") or ".py:" in name_f:
             # path/something:Class.method

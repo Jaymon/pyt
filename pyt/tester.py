@@ -134,7 +134,7 @@ class TestLoader(TestLoader):
         )
 
         for i, pf in enumerate(ts.path_guesser.possible, 1):
-            logger.debug("{}. Searching for tests matching: {}".format(i, pf))
+            logger.debug("{}. Searching for tests matching {}".format(i, pf))
             if pf.has_method():
                 for c, mn in pf.method_names():
                     logger.debug(
