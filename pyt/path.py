@@ -560,13 +560,6 @@ class PathFinder(object):
                     logger.warning(e, exc_info=True)
                     pass
 
-#             else:
-#                 if module_prefix:
-#                     # we found no paths so check if prefix is actually a file
-#                     path = os.path.join(self.basedir, f"{module_prefix}.py")
-#                     if os.path.isfile(path):
-#                         yield path
-
     def module_path(self, filepath):
         """given a filepath like /base/path/to/module.py this will convert it
         to path.to.module so it can be imported"""
@@ -739,16 +732,6 @@ class PathGuesser(object):
                 name_f = gfp
                 name = name_f
                 break
-
-        # unittest.TestProgram strips .py from passed in test names (eg,
-        # `foo_test.py` would become `foo_test`) so we need to add the .py back
-        # and check if it is a valid filepath, otherwise it will get missed.
-        # This check will fail on case-sensitive filesystems if the name or
-        # extension has uppercase characters
-#         if os.path.isfile(f"{name_f}.py"):
-#             name_f = f"{name_f}.py"
-# 
-#         pout.v(self)
 
         filepath = ""
         if name_f.endswith(".py") or ".py:" in name_f:
