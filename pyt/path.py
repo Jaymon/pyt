@@ -504,7 +504,7 @@ class PathFinder(object):
                         path = basedir
 
                     if os.path.isfile(path):
-                        logger.debug('Module path: {}'.format(path))
+                        logger.debug("Module path: %s", path)
                         yield path
 
                     else:
@@ -516,9 +516,8 @@ class PathFinder(object):
                                         filepath = os.path.join(root, basename)
                                         if filepath not in seen_paths:
                                             logger.debug(
-                                                'Module package path: {}'.format(
-                                                    filepath
-                                                )
+                                                "Module package path: %s",
+                                                filepath,
                                             )
                                             seen_paths.add(filepath)
                                             yield filepath
@@ -533,9 +532,8 @@ class PathFinder(object):
                                             )
                                             if filepath not in seen_paths:
                                                 logger.debug(
-                                                    'Module postfix path: {}'.format(
-                                                        filepath
-                                                    )
+                                                    "Module postfix path: %s",
+                                                    filepath,
                                                 )
                                                 seen_paths.add(filepath)
                                                 yield filepath
@@ -548,9 +546,8 @@ class PathFinder(object):
                                             )
                                             if filepath not in seen_paths:
                                                 logger.debug(
-                                                    'Module prefix path: {}'.format(
-                                                        filepath
-                                                    )
+                                                    "Module prefix path: %s",
+                                                    filepath,
                                                 )
                                                 seen_paths.add(filepath)
                                                 yield filepath
@@ -701,51 +698,133 @@ class PathGuesser(object):
         this uses PEP 8 conventions, so foo.Bar would be foo module with class
         Bar.
 
-        sets .possible (list[PathFinder]), a list of possible interpretations of
-        the module path (eg, foo.bar can be bar module in foo module, or bar
+        sets .possible (list[PathFinder]), a list of possible interpretations
+        of the module path (eg, foo.bar can be bar module in foo module, or bar
         method in foo module)
         '''
         possible = []
         name = self.name
 
-        logger.debug('Guessing test name: {}'.format(name))
+        logger.debug("Guessing test name: %s", name)
 
-        # find potential filepaths using the the name and prefix
-        filepaths = []
-        if name:
-            filepaths.append(name)
-
-        if self.prefixes:
-            for prefix in self.prefixes:
-                filepaths.append(prefix)
-                if name:
-                    filepaths.append(os.path.join(prefix, name))
-
-        # unittest.TestProgram strips .py from passed in test names (eg,
-        # `foo_test.py` would become `foo_test`) so we need to add the .py back
-        # and check if it is a valid filepath, otherwise it will get missed.
-        # This check will fail on case-sensitive filesystems if the name or
-        # extension has uppercase characters
-        name_f = name.lower()
-        for fp in filepaths:
-            for gfp in glob.glob(f"{fp}.py", recursive=False):
-                name_f = gfp
-                name = name_f
-                break
-
-        filepath = ""
-        if name_f.endswith(".py") or ".py:" in name_f:
-            # path/something:Class.method
+        if "/" in name or re.search(r"\.py(?:\:|$)", name, flags=re.I):
             bits = name.split(":", 1)
             filepath = bits[0]
-            logger.debug('Found filepath: {}'.format(filepath))
+            logger.debug("Found filepath: %s", filepath)
 
             name = bits[1] if len(bits) > 1 else ""
             if name:
-                logger.debug('Found test name: {} for filepath: {}'.format(
+                logger.debug(
+                    "Found test name: %s for filepath: %s",
                     name,
-                    filepath
-                ))
+                    filepath,
+                )
+
+        else:
+            # find potential filepaths using the the name and prefix
+            filepath = ""
+
+            if name and os.path.isfile(name):
+                filepath = name
+                name = ""
+
+            def find_filepath(prefix, name):
+                pn = os.path.join(prefix, name) if name else prefix
+                globiter = glob.iglob(
+                    f"{pn}.[pP][yY]",
+                    root_dir=self.basedir,
+                    recursive=False,
+                )
+                for filepath in globiter:
+                    return filepath
+
+            if not filepath:
+                for prefix in self.prefixes:
+                    filepath = find_filepath(prefix, "")
+                    if filepath:
+                        break
+
+            if not filepath:
+                for prefix in self.prefixes:
+                    filepath = find_filepath(prefix, name)
+                    if filepath:
+                        name = ""
+                        break
+
+#             filepaths = []
+#             if name:
+#                 filepaths.append(name)
+# 
+#             if self.prefixes:
+#                 for prefix in self.prefixes:
+#                     filepaths.append(prefix)
+#                     if name:
+#                         filepaths.append(os.path.join(prefix, name))
+# 
+#             for filepath in filepaths:
+#                 gfps = glob.iglob(
+#                     f"{filepath}.[pP][yY]",
+#                     root_dir=self.basedir,
+#                     recursive=False,
+#                 )
+#                 for gfp in gfps:
+#                     name_f = gfp
+#                     #name = name_f
+#                     filepath = name_f
+#                     break
+# 
+# 
+# 
+# 
+# 
+# 
+#         # find potential filepaths using the the name and prefix
+#         filepaths = []
+#         if name:
+#             filepaths.append(name)
+# 
+#         if self.prefixes:
+#             for prefix in self.prefixes:
+#                 filepaths.append(prefix)
+#                 if name:
+#                     filepaths.append(os.path.join(prefix, name))
+# 
+#         # unittest.TestProgram strips .py from passed in test names (eg,
+#         # `foo_test.py` would become `foo_test`) so we need to add the .py back
+#         # and check if it is a valid filepath, otherwise it will get missed.
+#         # This check will fail on case-sensitive filesystems if the name or
+#         # extension has uppercase characters
+#         filepath = ""
+#         name_f = name.lower()
+#         for fp in filepaths:
+#             gfps = glob.iglob(
+#                 f"{fp}.py",
+#                 root_dir=self.basedir,
+#                 recursive=False,
+#             )
+#             for gfp in gfps:
+#                 name_f = gfp
+#                 #name = name_f
+#                 filepath = name_f
+#                 break
+# 
+#         pout.v(name_f, filepath)
+# 
+#         if name_f.endswith(".py") or ".py:" in name_f:
+#             # path/something:Class.method
+#             bits = name.split(":", 1)
+#             filepath = bits[0]
+#             logger.debug("Found filepath: %s", filepath)
+# 
+#             name = bits[1] if len(bits) > 1 else ""
+#             if name:
+#                 logger.debug(
+#                     "Found test name: %s for filepath: %s",
+#                     name,
+#                     filepath,
+#                 )
+
+#         pout.v(filepath, name)
 
         # https://github.com/Jaymon/pyt/issues/41
         if m := re.match(r"(\S+)\s+\(([^\)]+)\)", name):
@@ -787,7 +866,7 @@ class PathGuesser(object):
 
             # check if the last bit is a Class
             if re.search(r'^\*?[A-Z]', bits[-1]):
-                logger.debug('Found classname: {}'.format(bits[-1]))
+                logger.debug("Found classname: %s", bits[-1])
 
                 possible.extend(self.create_finders(
                     class_name=bits[-1],
@@ -797,7 +876,7 @@ class PathGuesser(object):
                 ))
 
             elif len(bits) > 1 and re.search(r'^\*?[A-Z]', bits[-2]):
-                logger.debug('Found classname: {}'.format(bits[-2]))
+                logger.debug("Found classname: %s", bits[-2])
 
                 possible.extend(self.create_finders(
                     class_name=bits[-2],
@@ -846,7 +925,7 @@ class PathGuesser(object):
                         filepath=filepath,
                     ))
 
-        logger.debug("Found {} possible test names".format(len(possible)))
+        logger.debug("Found %d possible test names", len(possible))
         self.possible = possible
 
 
