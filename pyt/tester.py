@@ -306,6 +306,13 @@ class TestRunner(TextTestRunner):
         result = super().run(test)
 
         if self.verbosity > 1:
+            # print out how many ran to total tests
+            # https://github.com/Jaymon/pyt/issues/48
+            ran_count = result.testsRun
+            total_count = test.countTestCases()
+            self.stream.writeln(f"Ran {ran_count}/{total_count} tests")
+            self.stream.writeln("")
+
             if len(result.errors) or len(result.failures):
                 with RerunFile() as fp:
                     count = len(result.errors) + len(result.failures)
