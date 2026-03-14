@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 import os
 from unittest import (
     TestLoader,
     TextTestRunner,
     TextTestResult,
     TestSuite,
-    TestCase
+    TestCase,
 )
 from unittest.main import TestProgram
 import time
@@ -15,6 +14,8 @@ import sys
 import platform
 import warnings
 import itertools
+import inspect
+import re
 
 from .compat import *
 from .utils import testpath, classpath, loghandler_members, modname
@@ -282,6 +283,22 @@ class TestRunner(TextTestRunner):
         result.program = self.program
         return result
 
+    def _get_line_number(self, testcase: TestCase, failure: str) -> int:
+        """Get the line number where the test failed"""
+
+        # This feels like a terrible way to do this but I couldn't think of a
+        # better way to do it
+        if tc_path := inspect.getfile(type(testcase)):
+            for line in failure.splitlines():
+                if tc_path in line:
+                    if m := re.search(r"line (\d+)", line):
+                        return int(m.group(1))
+
+                    else:
+                        raise ValueError("Line formatting has changed")
+
+        return 0
+
     def run(self, test):
         # this will be used to set the TestProgram instance into TestResult
         self.program = test.program
@@ -292,25 +309,27 @@ class TestRunner(TextTestRunner):
             if len(result.errors) or len(result.failures):
                 with RerunFile() as fp:
                     count = len(result.errors) + len(result.failures)
-                    self.stream.writeln(
-                        "Failed or errored {} tests:".format(count)
-                    )
+                    self.stream.writeln(f"Failed or errored {count} tests:")
 
                     for testcase, failure in itertools.chain(
                         result.errors,
-                        result.failures
+                        result.failures,
                     ):
                         tp = testpath(testcase)
-                        self.stream.writeln(tp)
+                        if ln := self._get_line_number(testcase, failure):
+                            self.stream.writeln(f"* {tp} on line {ln}")
+
+                        else:
+                            self.stream.writeln(f"* {tp}")
+
                         fp.writeln(tp)
+
                 self.stream.writeln("")
 
             if len(result.skipped):
-                self.stream.writeln(
-                    "Skipped {} tests:".format(len(result.skipped))
-                )
+                self.stream.writeln(f"Skipped {len(result.skipped)} tests:")
                 for testcase, failure in result.skipped:
-                    self.stream.writeln(testpath(testcase))
+                    self.stream.writeln(f"* {testpath(testcase)}")
                 self.stream.writeln("")
 
         return result

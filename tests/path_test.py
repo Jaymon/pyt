@@ -578,6 +578,19 @@ class PathGuesserTest(TestCase):
         self.assertEqual("tests.py", pf.filepath)
         self.assertEqual("bar", pf.method_name)
 
+    def test_issue_49(self):
+        """Make sure line numbers are printed out on failed tests
+
+        https://github.com/Jaymon/pyt/issues/49
+        """
+        m = TestModule(
+            "class LineNumberTest(TestCase):",
+            "    def test_fail_linenumber(self):",
+            "        self.fail()",
+        )
+        r = m.client.run("-d", code=1)
+        self.assertTrue(r.strip().endswith("line 6"))
+
 
 class RerunFileTest(TestCase):
     def test_rerun(self):
