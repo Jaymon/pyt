@@ -325,33 +325,45 @@ class TestRunner(TextTestRunner):
         result = super().run(test)
 
         if self.verbosity > 1:
-            self.stream.writeln("")
-
-            # print out how many ran to total tests
-            # https://github.com/Jaymon/pyt/issues/48
-            ran_count = result.testsRun
             total_count = test.countTestCases()
-            self.stream.writeln(f"Ran {ran_count}/{total_count} tests")
 
-            if test_cases:
-                tc_names = {type(tc).__name__: [0, 0.0] for tc in test_cases}
-                for tn, duration in result.collectedDurations:
-                    for tc_name in tc_names.keys():
-                        if tc_name in tn:
-                            tc_names[tc_name][0] += 1
-                            tc_names[tc_name][1] += duration
+            if len(test_cases) > 1:
+                tc_names = {
+                    type(tc).__name__: [0, 0.0] for tc in test_cases
+                }
 
-                for tc_name, tc_counts in tc_names.items():
-                    tc, td = tc_counts
-                    v = "tests" if tc > 1 else "test"
-                    self.stream.writeln(f"* {tc_name} - {tc} {v} in {td:.3f}s")
+                if len(tc_names) > 1:
+                    # print out how many ran to total tests
+                    # https://github.com/Jaymon/pyt/issues/48
+                    ran_count = result.testsRun
 
-                self.stream.writeln("")
+                    self.stream.writeln("")
+                    self.stream.writeln(
+                        f"Ran {ran_count}/{total_count} tests"
+                        f" across {len(tc_names)} classes:",
+                    )
+
+                    for tn, duration in result.collectedDurations:
+                        for tc_name in tc_names.keys():
+                            if tc_name in tn:
+                                tc_names[tc_name][0] += 1
+                                tc_names[tc_name][1] += duration
+
+                    for tc_name, tc_counts in tc_names.items():
+                        tc, td = tc_counts
+                        v = "tests" if tc > 1 else "test"
+                        self.stream.writeln(
+                            f"* {tc_name} - {tc} {v} in {td:.3f}s",
+                        )
+
+                    self.stream.writeln("")
 
             if len(result.errors) or len(result.failures):
                 with RerunFile() as fp:
                     count = len(result.errors) + len(result.failures)
-                    self.stream.writeln(f"Failed or errored {count} tests:")
+                    self.stream.writeln(
+                        f"Failed or errored {count}/{total_count} tests:"
+                    )
 
                     for testcase, failure in itertools.chain(
                         result.errors,
@@ -369,7 +381,9 @@ class TestRunner(TextTestRunner):
                 self.stream.writeln("")
 
             if len(result.skipped):
-                self.stream.writeln(f"Skipped {len(result.skipped)} tests:")
+                self.stream.writeln(
+                    f"Skipped {len(result.skipped)}/{total_count} tests:"
+                )
                 for testcase, failure in result.skipped:
                     self.stream.writeln(f"* {testpath(testcase)}")
                 self.stream.writeln("")

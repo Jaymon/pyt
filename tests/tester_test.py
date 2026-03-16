@@ -685,7 +685,7 @@ class TestProgramTest(TestCase):
             "",
         ])
         r = m.client.run([m.name, "-d"])
-        self.assertTrue("Skipped 1 tests" in r)
+        self.assertTrue("Skipped 1/1 tests" in r)
 
         m = TestModule([
             "from unittest import skip",
@@ -696,7 +696,7 @@ class TestProgramTest(TestCase):
             "",
         ])
         r = m.client.run([m.name, "-d"])
-        self.assertTrue("Skipped 1 tests" in r)
+        self.assertTrue("Skipped 1/1 tests" in r)
 
         m = TestModule([
             "class OneTest(TestCase):",
@@ -711,7 +711,7 @@ class TestProgramTest(TestCase):
         # 1 - python <3.12
         # 5 - python >=3.12
         r = m.client.run([m.name, "-d"], code=[1, 5])
-        self.assertTrue("Failed or errored 1 tests" in r)
+        self.assertTrue("Failed or errored 1/1 tests" in r)
         self.assertFalse("_ErrorLoader" in r)
 
         m = TestModule([
@@ -724,7 +724,7 @@ class TestProgramTest(TestCase):
             "",
         ])
         r = m.client.run([m.name, "-d"], code=1)
-        self.assertTrue("Failed or errored 1 tests" in r)
+        self.assertTrue("Failed or errored 1/1 tests" in r)
 
         m = TestModule([
             "class OneTest(TestCase):",
@@ -733,7 +733,7 @@ class TestProgramTest(TestCase):
             "",
         ])
         r = m.client.run([m.name, "-d"], code=1)
-        self.assertTrue("Failed or errored 1 tests" in r)
+        self.assertTrue("Failed or errored 1/1 tests" in r)
 
         m = TestModule([
             "class OneTest(TestCase):",
@@ -742,27 +742,7 @@ class TestProgramTest(TestCase):
             "",
         ])
         r = m.client.run([m.name, "-d"], code=1)
-        self.assertTrue("Failed or errored 1 tests" in r)
-
-#     def test_prefix_flag(self):
-#         """
-#         https://github.com/Jaymon/pyt/issues/44
-#         """
-#         return
-# 
-#         m = TestModule([
-#             "class OneTest(TestCase):",
-#             "    def test_one(self):",
-#             "        pass",
-#             "",
-#         ])
-# 
-#         pout.v(m.name)
-# 
-#         prefix, modname = m.name.split(".", 1)
-# 
-#         m.client.run(["--prefix", prefix, modname])
-
+        self.assertTrue("Failed or errored 1/1 tests" in r)
 
 
 class TestLoaderTest(TestCase):
