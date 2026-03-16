@@ -517,38 +517,6 @@ class PathGuesserTest(TestCase):
         pf = list(pg.create_finders())[0]
         self.assertEqual(m.prefix, pf.prefix)
 
-#     def test_issue_50(self):
-#         """
-#         https://github.com/Jaymon/pyt/issues/50
-#         """
-#         modpath = self.create_module("""
-#             from unittest import TestCase
-# 
-#             class FooTest(TestCase):
-#                 def test_bar(self):
-#                     print("test_bar")
-#                 def test_che(self):
-#                     print("test_che")
-#         """)
-#         #, name="tests")
-# 
-#         pout.v(modpath.path)
-# 
-#         pf = PathFinder(
-#             modpath.path,
-#             class_name="Foo",
-#             method_name="bar",
-#         )
-# 
-#         pout.b()
-# 
-#         pout.v(pf.method_names())
-# 
-#         #pout.v(pg.possible)
-#         #pout.v(pg.create_finders())
-# 
-# 
-
     def test_issue_50(self):
         """You couldn't narrow down a test when the `tests` prefix was a
         module (eg, `tests.py`), this makes sure that is fixed

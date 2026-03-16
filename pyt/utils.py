@@ -52,6 +52,31 @@ def modname():
     return name
 
 
+def get_testcase_name(line: str) -> tuple[str, str]:
+    """The unittest stuff likes to return test case names like:
+
+        test_method_name (tests.modpath.NameTestCase.test_method_name)
+        test_method_name (tests.modpath.NameTestCase)
+
+    This returns a tuple of the method name (`test_method_name`) and the full
+    test path (`tests.modpath.NameTestCase.test_method_name`)
+
+    :raises: ValueError if the format is different than expected
+    """
+    # https://github.com/Jaymon/pyt/issues/41
+    if m := re.match(r"(\S+)\s+\(([^\)]+)\)", line):
+        if m.group(2).endswith(m.group(1)):
+            testpath = m.group(2)
+
+        else:
+            testpath = "{}.{}".format(m.group(2), m.group(1))
+
+        name = m.group(1)
+        return name, testpath
+
+    raise ValueError(f"Unrecognized testcase name: {line}")
+
+
 def loghandler_members():
     """iterate through the attributes of every logger's handler
 

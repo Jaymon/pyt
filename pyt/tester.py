@@ -73,6 +73,20 @@ class TestSuite(TestSuite):
 
         return "\n".join(lines) if has_method_names else ""
 
+    def get_test_cases(self) -> list[TestCase]:
+        test_cases = []
+        for test in self._tests:
+            if isinstance(test, TestSuite):
+                test_cases.extend(test.get_test_cases())
+
+            elif isinstance(test, TestCase):
+                test_cases.append(test)
+
+            else:
+                logger.warning("Unknown test type: %s", type(test))
+
+        return test_cases
+
     def run(self, result, *args, **kwargs):
         # we surface any PathGuesser errors here because this is one of the
         # first times we have access to the result and we want PathGuesser's
@@ -303,15 +317,36 @@ class TestRunner(TextTestRunner):
         # this will be used to set the TestProgram instance into TestResult
         self.program = test.program
 
+        test_cases = []
+        if self.verbosity > 1:
+            for suite in test._tests:
+                test_cases.extend(suite.get_test_cases())
+
         result = super().run(test)
 
         if self.verbosity > 1:
+            self.stream.writeln("")
+
             # print out how many ran to total tests
             # https://github.com/Jaymon/pyt/issues/48
             ran_count = result.testsRun
             total_count = test.countTestCases()
             self.stream.writeln(f"Ran {ran_count}/{total_count} tests")
-            self.stream.writeln("")
+
+            if test_cases:
+                tc_names = {type(tc).__name__: [0, 0.0] for tc in test_cases}
+                for tn, duration in result.collectedDurations:
+                    for tc_name in tc_names.keys():
+                        if tc_name in tn:
+                            tc_names[tc_name][0] += 1
+                            tc_names[tc_name][1] += duration
+
+                for tc_name, tc_counts in tc_names.items():
+                    tc, td = tc_counts
+                    v = "tests" if tc > 1 else "test"
+                    self.stream.writeln(f"* {tc_name} - {tc} {v} in {td:.3f}s")
+
+                self.stream.writeln("")
 
             if len(result.errors) or len(result.failures):
                 with RerunFile() as fp:

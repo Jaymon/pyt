@@ -12,7 +12,7 @@ import tempfile
 import glob
 
 from .compat import *
-from .utils import modname
+from .utils import modname, get_testcase_name
 
 
 logger = logging.getLogger(__name__)
@@ -751,9 +751,19 @@ class PathGuesser(object):
                         name = ""
                         break
 
+        try:
+            name, testpath = get_testcase_name(name)
+
+        except ValueError:
+            pass
+
         # https://github.com/Jaymon/pyt/issues/41
-        if m := re.match(r"(\S+)\s+\(([^\)]+)\)", name):
-            name = "{}.{}".format(m.group(2), m.group(1))
+#         if m := re.match(r"(\S+)\s+\(([^\)]+)\)", name):
+#             if m.group(2).endswith(m.group(1)):
+#                 name = m.group(2)
+# 
+#             else:
+#                 name = "{}.{}".format(m.group(2), m.group(1))
 
         if ":" in name:
             logger.debug('Found standard python path: {}'.format(name))
