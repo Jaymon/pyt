@@ -328,11 +328,18 @@ class TestRunner(TextTestRunner):
             total_count = test.countTestCases()
 
             if len(test_cases) > 1:
-                tc_names = {
+                t_names = {
                     type(tc).__name__: [0, 0.0] for tc in test_cases
                 }
+                class_type = "classes"
 
-                if len(tc_names) > 1:
+                if len(t_names) > 30:
+                    t_names = {
+                        type(tc).__module__: [0, 0.0] for tc in test_cases
+                    }
+                    class_type = "modules"
+
+                if len(t_names) > 1:
                     # print out how many ran to total tests
                     # https://github.com/Jaymon/pyt/issues/48
                     ran_count = result.testsRun
@@ -340,16 +347,16 @@ class TestRunner(TextTestRunner):
                     self.stream.writeln("")
                     self.stream.writeln(
                         f"Ran {ran_count}/{total_count} tests"
-                        f" across {len(tc_names)} classes:",
+                        f" across {len(t_names)} {class_type}:",
                     )
 
                     for tn, duration in result.collectedDurations:
-                        for tc_name in tc_names.keys():
+                        for tc_name in t_names.keys():
                             if tc_name in tn:
-                                tc_names[tc_name][0] += 1
-                                tc_names[tc_name][1] += duration
+                                t_names[tc_name][0] += 1
+                                t_names[tc_name][1] += duration
 
-                    for tc_name, tc_counts in tc_names.items():
+                    for tc_name, tc_counts in t_names.items():
                         tc, td = tc_counts
                         v = "tests" if tc > 1 else "test"
                         self.stream.writeln(
