@@ -955,3 +955,16 @@ class TestLoaderTest(TestCase):
         s = tl.loadTestsFromName('{}.foo'.format(m.name))
         self.assertTrue('test_foo' in str(s))
 
+    def test_negative_name(self):
+        m = TestModule(
+            "class CheTest(TestCase):",
+            "   def test_foo(self): pass"
+        )
+        tl = m.loader
+        tl.program.ignore_testpaths = set([
+            "{}.CheTest.test_foo".format(m.name),
+        ])
+
+        s = tl.loadTestsFromName(m.name)
+        self.assertEqual(0, len(list(s.get_testpaths())))
+

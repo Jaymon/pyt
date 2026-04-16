@@ -1,4 +1,5 @@
 import os
+from collections.abc import Generator
 from unittest import (
     TestLoader,
     TextTestRunner,
@@ -6,7 +7,7 @@ from unittest import (
     TestSuite,
     TestCase,
 )
-from unittest.main import TestProgram
+from unittest.main import TestProgram, _convert_names
 import time
 import logging
 import argparse
@@ -87,6 +88,15 @@ class TestSuite(TestSuite):
 
         return test_cases
 
+    def get_testpaths(self) -> Generator[str]:
+        for test in self._tests:
+            if isinstance(test, type(self)):
+                yield from test.get_testpaths()
+
+            else:
+                if tp := testpath(test):
+                    yield tp
+
     def run(self, result, *args, **kwargs):
         # we surface any PathGuesser errors here because this is one of the
         # first times we have access to the result and we want PathGuesser's
@@ -114,14 +124,11 @@ class TestLoader(TestLoader):
     suiteClass = TestSuite
 
     def loadTestsFromNames(self, names, *args, **kwargs):
-
-        if names:
-            ts = super().loadTestsFromNames(names, *args, **kwargs)
-
-        else:
-            ts = self.loadTestsFromName("", *args, **kwargs)
-
+        ts = super().loadTestsFromNames(names, *args, **kwargs)
         ts.program = self.program
+
+#         if ignore_names := self.program.ignore_tests:
+#             self.ignoreTestsFromNames(ignore_names, ts, *args, **kwargs)
 
         test_count = ts.countTestCases()
         logger.debug("Found {} total tests".format(test_count))
@@ -140,7 +147,7 @@ class TestLoader(TestLoader):
             name,
             basedir=self._top_level_dir,
             method_prefix=self.testMethodPrefix,
-            prefixes=program.prefixes
+            prefixes=program.prefixes,
         )
         found = False
 
@@ -190,9 +197,30 @@ class TestLoader(TestLoader):
         return suite
 
     def loadTestsFromMethodName(self, testCaseClass, method_name):
-        suite = self.suiteClass([testCaseClass(method_name)])
+        testCaseNames = self.getTestCaseNames(testCaseClass, [method_name])
+        suite = self.suiteClass(map(testCaseClass, testCaseNames)) 
+        #suite = self.suiteClass([testCaseClass(method_name)])
         suite.name = f"{testCaseClass.__module__}.{testCaseClass.__qualname__}"
         return suite
+
+    def getTestCaseNames(
+        self,
+        testCaseClass: type[TestCase],
+        testnames: list[str]|None = None,
+    ) -> list[str]:
+        if not testnames:
+            testnames = super().getTestCaseNames(testCaseClass)
+
+        if ignored := self.program.ignore_testpaths:
+            testnames = [
+                n for n in testnames
+                if testpath(testCaseClass, n) not in ignored
+            ]
+
+            #testpaths = (testpath(testCaseClass, n) for n in testnames)
+            #testnames = [tp for tp in testpaths if tp not in ignored]
+
+        return testnames
 
 
 class TestResult(TextTestResult):
@@ -468,7 +496,7 @@ class TestProgram(TestProgram):
         kwargs.setdefault("testRunner", TestRunner)
 
         # we want to get around all the .module is None checks
-        kwargs.setdefault("module", __name__)
+        #kwargs.setdefault("module", __name__)
 
         # anything after this line will not be run because once we enter into
         # the parent's __init__ then it begins to actually compile and call all
@@ -479,26 +507,82 @@ class TestProgram(TestProgram):
         """Ideally we would put a lot of this configuration in .parseArgs but
         that method calls this method or ._do_discovery
         """
-        # if we didn't pass in any test names then we want to find all tests
-        if not self.tests and self.rerun_failed_tests:
-            self.testNames = list(RerunFile())
+        if self.rerun_failed_tests:
+            if self.testNames:
+                raise ValueError("Rerun flag passed in with tests arguments")
 
-        # we need to set .testNames to anything but None to short circuit
-        # parent's routing to try and load tests from a module
+            else:
+                self.testNames = list(RerunFile())
+
+        # if we didn't pass in any test names then we want to find all tests
+        # which would be the empty value, we need to set `.testNames` like
+        # this to short circuit parent's routing to try and load tests from
+        # a module. Without this being set then parent's `.createTests`
+        # method will find tests using `.module`
         if not self.testNames:
-            self.testNames = []
+            self.testNames = [""]
 
         # if the --prefix flag was used on the command line then ignore the
         # environment prefixes
         if not self.prefixes:
             self.prefixes = self.environ.get_prefixes()
 
-        # TestLoader is used to load the tests and .test is set in parent's 
-        # .createTest method
+        self.ignore_testpaths = None
+        if self.ignore_tests:
+            if Loader is None:
+                Loader = type(self.testLoader)
+
+            loader = Loader()
+            loader.program = self
+            its = loader.loadTestsFromNames(_convert_names(self.ignore_tests))
+
+            self.ignore_testpaths = set(its.get_testpaths())
+
+        # `.testLoader` is used to load the tests and .test is set in parent's 
+        # `.createTest` method
         super().createTests(
-            from_discovery=False,
-            Loader=Loader
+            from_discovery=from_discovery,
+            Loader=Loader,
         )
+
+        # `.tests` should now be set
+#         if self.ignore_tests:
+#             if Loader is None:
+#                 Loader = type(self.testLoader)
+# 
+#             loader = Loader()
+#             loader.program = self
+#             its = loader.loadTestsFromNames(_convert_names(self.ignore_tests))
+# 
+#             #for suite in its._tests:
+#             self.ignore_testpaths = set(its.get_testpaths())
+
+#             tss = [self.test]
+#             while tss:
+#                 ts = tss.pop(0)
+#                 tests = []
+# 
+#                 for test in ts._tests:
+#                     if isinstance(test, TestSuite):
+#                         tests.append(test)
+#                         tss.append(test)
+# 
+#                     elif isinstance(test, TestCase):
+#                         tp = testpath(test)
+#                         if tp not in ignore_testpaths:
+#                             tests.append(test)
+# 
+#                 ts._tests = tests
+# 
+#             for tc in self.test.get_test_cases():
+#                 pout.v(tc)
+
+#             for suite in self.test._tests:
+#                 pout.v(suite)
+
+            #pout.v(ignore_testpaths)
+            #pout.v(its)
+
 
     def _getParentArgParser(self):
         """Get the argument parser and add any custom flags
@@ -517,8 +601,8 @@ class TestProgram(TestProgram):
             version="%(prog)s {}, Python {} ({})".format(
                 __version__,
                 platform.python_version(),
-                sys.executable
-            )
+                sys.executable,
+            ),
         )
 
         # https://docs.python.org/2/library/warnings.html
@@ -528,7 +612,7 @@ class TestProgram(TestProgram):
             action="store_const",
             const="error",
             default="",
-            help="Converts warnings into errors"
+            help="Converts warnings into errors",
         )
 
         parser.add_argument(
@@ -536,14 +620,14 @@ class TestProgram(TestProgram):
             dest="verbosity",
             action="store_const",
             const=2,
-            help="Verbose output"
+            help="Verbose output",
         )
 
         parser.add_argument(
             '--rerun',
             dest="rerun_failed_tests",
             action="store_true",
-            help="Rerun previously failed tests"
+            help="Rerun previously failed tests",
         )
 
         parser.add_argument(
@@ -554,14 +638,26 @@ class TestProgram(TestProgram):
             help=(
                 "The prefix(es)"
                 " (python module paths where TestCase subclasses are found)"
-            )
+            ),
         )
 
         parser.add_argument(
             '--list', "-L",
             dest="list_found_tests",
             action="store_true",
-            help="print out found tests"
+            help="print out found tests",
+        )
+
+        parser.add_argument(
+            '--not', "-n",
+            dest="ignore_tests",
+            action="append",
+            default=[],
+            metavar="TEST",
+            help=(
+                "Similar to tests positional argument but ignores"
+                " matching tests"
+            ),
         )
 
         return parser
