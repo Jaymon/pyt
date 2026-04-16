@@ -968,3 +968,13 @@ class TestLoaderTest(TestCase):
         s = tl.loadTestsFromName(m.name)
         self.assertEqual(0, len(list(s.get_testpaths())))
 
+    def test_private_class(self):
+        m = TestModule(
+            "class _CheTest(TestCase):",
+            "   def test_foo(self): pass"
+        )
+        tl = m.loader
+
+        s = tl.loadTestsFromName(m.name)
+        self.assertEqual(0, s.countTestCases())
+

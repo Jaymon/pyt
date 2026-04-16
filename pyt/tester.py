@@ -35,15 +35,15 @@ class TestSuite(TestSuite):
 
     https://github.com/python/cpython/blob/3.7/Lib/unittest/suite.py
     """
-    def addTest(self, test):
-        """This will filter out "private" classes that begin with an underscore
-        """
-        add_it = True
-        if isinstance(test, TestCase):
-            add_it = not test.__class__.__name__.startswith("_")
-
-        if add_it:
-            super().addTest(test)
+#     def addTest(self, test):
+#         """This will filter out "private" classes that begin with an underscore
+#         """
+#         add_it = True
+#         if isinstance(test, TestCase):
+#             add_it = not test.__class__.__name__.startswith("_")
+# 
+#         if add_it:
+#             super().addTest(test)
 
     def get_method_names(self, depth=0, indent="\t"):
         """Get all the test method names this suite represents in a
@@ -100,7 +100,7 @@ class TestSuite(TestSuite):
     def run(self, result, *args, **kwargs):
         # we surface any PathGuesser errors here because this is one of the
         # first times we have access to the result and we want PathGuesser's
-        # errors itegrated with the rest of the error 
+        # errors integrated with the rest of the error 
         if path_guesser := getattr(self, "path_guesser", None):
             for exc_info in path_guesser.get_any_error():
                 self._createClassOrModuleLevelException(
@@ -118,7 +118,7 @@ class TestLoader(TestLoader):
     """This custom loader acts as the translation layer from the cli to our
     path guessing and finding classes
 
-    https://docs.python.org/2/library/unittest.html#unittest.TestLoader
+    https://docs.python.org/3/library/unittest.html#unittest.TestLoader
     https://github.com/python/cpython/blob/3.7/Lib/unittest/loader.py
     """
     suiteClass = TestSuite
@@ -126,9 +126,6 @@ class TestLoader(TestLoader):
     def loadTestsFromNames(self, names, *args, **kwargs):
         ts = super().loadTestsFromNames(names, *args, **kwargs)
         ts.program = self.program
-
-#         if ignore_names := self.program.ignore_tests:
-#             self.ignoreTestsFromNames(ignore_names, ts, *args, **kwargs)
 
         test_count = ts.countTestCases()
         logger.debug("Found {} total tests".format(test_count))
@@ -186,21 +183,9 @@ class TestLoader(TestLoader):
 
         return ts
 
-    def loadTestsFromModule(self, module, *args, **kwargs):
-        suite = super().loadTestsFromModule(module, *args, **kwargs)
-        suite.name = module.__name__
-        return suite
-
-    def loadTestsFromTestCase(self, testCaseClass):
-        suite = super().loadTestsFromTestCase(testCaseClass)
-        suite.name = f"{testCaseClass.__module__}.{testCaseClass.__qualname__}"
-        return suite
-
     def loadTestsFromMethodName(self, testCaseClass, method_name):
         testCaseNames = self.getTestCaseNames(testCaseClass, [method_name])
         suite = self.suiteClass(map(testCaseClass, testCaseNames)) 
-        #suite = self.suiteClass([testCaseClass(method_name)])
-        suite.name = f"{testCaseClass.__module__}.{testCaseClass.__qualname__}"
         return suite
 
     def getTestCaseNames(
@@ -208,17 +193,33 @@ class TestLoader(TestLoader):
         testCaseClass: type[TestCase],
         testnames: list[str]|None = None,
     ) -> list[str]:
-        if not testnames:
-            testnames = super().getTestCaseNames(testCaseClass)
+        """Get all the test case test methods
 
-        if ignored := self.program.ignore_testpaths:
-            testnames = [
-                n for n in testnames
-                if testpath(testCaseClass, n) not in ignored
-            ]
+        This extends parent's functionality by allowing `testnames` to be
+        passed in. See `.loadTestFromMethodName` to see why this was added
 
-            #testpaths = (testpath(testCaseClass, n) for n in testnames)
-            #testnames = [tp for tp in testpaths if tp not in ignored]
+        This filters found testnames through any defined ignore patterns
+
+        This will filter `testCaseClass` names that start with an underscore
+        because this treats those as private
+
+        :param testnames: the test methods from `testCaseClass` that should
+            be filtered, if this is empty then all test names will be found
+            just like parent does
+        """
+        if testCaseClass.__name__.startswith("_"):
+            testnames = []
+
+        else:
+            if not testnames:
+                testnames = super().getTestCaseNames(testCaseClass)
+
+        if testnames:
+            if ignored := self.program.ignore_testpaths:
+                testnames = [
+                    n for n in testnames
+                    if testpath(testCaseClass, n) not in ignored
+                ]
 
         return testnames
 
@@ -495,9 +496,6 @@ class TestProgram(TestProgram):
         # .run method though, so the customization hook will have to be there
         kwargs.setdefault("testRunner", TestRunner)
 
-        # we want to get around all the .module is None checks
-        #kwargs.setdefault("module", __name__)
-
         # anything after this line will not be run because once we enter into
         # the parent's __init__ then it begins to actually compile and call all
         # the tests, it must call .runTests which can call sys.exit
@@ -545,51 +543,12 @@ class TestProgram(TestProgram):
             Loader=Loader,
         )
 
-        # `.tests` should now be set
-#         if self.ignore_tests:
-#             if Loader is None:
-#                 Loader = type(self.testLoader)
-# 
-#             loader = Loader()
-#             loader.program = self
-#             its = loader.loadTestsFromNames(_convert_names(self.ignore_tests))
-# 
-#             #for suite in its._tests:
-#             self.ignore_testpaths = set(its.get_testpaths())
-
-#             tss = [self.test]
-#             while tss:
-#                 ts = tss.pop(0)
-#                 tests = []
-# 
-#                 for test in ts._tests:
-#                     if isinstance(test, TestSuite):
-#                         tests.append(test)
-#                         tss.append(test)
-# 
-#                     elif isinstance(test, TestCase):
-#                         tp = testpath(test)
-#                         if tp not in ignore_testpaths:
-#                             tests.append(test)
-# 
-#                 ts._tests = tests
-# 
-#             for tc in self.test.get_test_cases():
-#                 pout.v(tc)
-
-#             for suite in self.test._tests:
-#                 pout.v(suite)
-
-            #pout.v(ignore_testpaths)
-            #pout.v(its)
-
-
     def _getParentArgParser(self):
         """Get the argument parser and add any custom flags
 
-        NOTE -- any flag you define will be set as an instance attribute
-        on self because self is passed into the parser's .parse_args method as
-        the Namespace object
+        .. note:: any flag you define will be set as an instance attribute
+            on self because self is passed into the parser's .parse_args
+            method as the Namespace object
         """
         from . import __version__ # avoid circular dependency
 
