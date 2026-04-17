@@ -424,6 +424,7 @@ class TestProgram(TestProgram):
     """
     @property
     def verbosity(self):
+        """We do some soft overriding of the parent parser's verbose flag"""
         return self._verbosity
 
     @verbosity.setter
@@ -497,42 +498,39 @@ class TestProgram(TestProgram):
         """Ideally we would put a lot of this configuration in .parseArgs but
         that method calls this method or `._do_discovery`, which then calls
         this method"""
-        if self.rerun_failed_tests:
-            if (
-                self.testNames
-                and (
-                    len(self.testNames) > 1
-                    or self.testNames[0] != ""
+        if not from_discovery:
+            if self.rerun_failed_tests:
+                if (
+                    self.testNames
+                    and (
+                        len(self.testNames) > 1
+                        or self.testNames[0] != ""
+                    )
+                ):
+                    raise ValueError(
+                        "Rerun flag passed in with tests arguments",
+                    )
+
+                else:
+                    self.testNames = list(RerunFile())
+
+            # if the --prefix flag was used on the command line then ignore the
+            # environment prefixes
+            if not self.prefixes:
+                self.prefixes = self.environ.get_prefixes()
+
+            self.ignore_testpaths = None
+            if self.ignore_tests:
+                if Loader is None:
+                    Loader = type(self.testLoader)
+
+                loader = Loader()
+                loader.program = self
+                self.ignore_testpaths = set(
+                    loader.loadTestsFromNames(
+                        _convert_names(self.ignore_tests),
+                    ).get_testpaths(),
                 )
-            ):
-                raise ValueError("Rerun flag passed in with tests arguments")
-
-            else:
-                self.testNames = list(RerunFile())
-
-        # if we didn't pass in any test names then we want to find all tests
-        # which would be the empty value, we need to set `.testNames` like
-        # this to short circuit parent's routing to try and load tests from
-        # a module. Without this being set then parent's `.createTests`
-        # method will find tests using `.module`
-#         if not self.testNames:
-#             self.testNames = [""]
-
-        # if the --prefix flag was used on the command line then ignore the
-        # environment prefixes
-        if not self.prefixes:
-            self.prefixes = self.environ.get_prefixes()
-
-        self.ignore_testpaths = None
-        if self.ignore_tests:
-            if Loader is None:
-                Loader = type(self.testLoader)
-
-            loader = Loader()
-            loader.program = self
-            its = loader.loadTestsFromNames(_convert_names(self.ignore_tests))
-
-            self.ignore_testpaths = set(its.get_testpaths())
 
         # `.testLoader` is used to load the tests and .test is set in parent's 
         # `.createTest` method
@@ -545,7 +543,7 @@ class TestProgram(TestProgram):
         """Get the argument parser and add any custom flags
 
         .. note:: any flag you define will be set as an instance attribute
-            on self because self is passed into the parser's .parse_args
+            because `self` is passed into the parser's `.parse_args`
             method as the Namespace object
         """
         from . import __version__ # avoid circular dependency
@@ -571,14 +569,6 @@ class TestProgram(TestProgram):
             default=self.warnings,
             help="Converts warnings into errors",
         )
-
-#         parser.add_argument(
-#             "--debug", "-d",
-#             dest="verbosity",
-#             action="store_const",
-#             const=2,
-#             help="Verbose output",
-#         )
 
         parser.add_argument(
             '--rerun',
