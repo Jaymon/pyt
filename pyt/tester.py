@@ -75,13 +75,9 @@ class TestSuite(TestSuite):
     def get_testpaths(self) -> Generator[str]:
         """Get the full test paths (<MODULE>.<CLASSNAME>.<METHOD_NAME>)
         for all the tests this testsuite represents"""
-        for test in self._tests:
-            if isinstance(test, type(self)):
-                yield from test.get_testpaths()
-
-            else:
-                if tp := testpath(test):
-                    yield tp
+        for tc in self.get_testcases():
+            if tp := testpath(test):
+                yield tp
 
     def run(self, result, *args, **kwargs):
         # we surface any PathGuesser errors here because this is one of the
