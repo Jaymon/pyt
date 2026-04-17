@@ -31,18 +31,26 @@ To run all the `newmodule` tests:
 To run more than one test:
 
     $ pyt test1 test2 ...
+    
+To run all but the `foo` tests:
+
+    $ pyt -n foo
 
 To run every test `pyt` can find:
 
     $ pyt
+    
+To see all the tests `pyt` can find:
+
+    $ pyt --list
 
 And the way I like to run all tests in the current directory:
 
-    $ pyt -vb
+    $ pyt -vbf
     
 Which can also be written:
 
-	$ pyt --verbose --buffer
+	$ pyt --verbose --buffer --failfast
 
 
 ### Flags
@@ -62,6 +70,10 @@ This will convert warnings into errors.
 If your last testrun had failing tests this will rerun only the tests that failed.
 
 	$pyt --rerun
+	
+#### --not <PATTERN>
+
+This reverses `<PATTERN>` so it removes matching tests from the run list.
 
 
 ### Things to be aware of

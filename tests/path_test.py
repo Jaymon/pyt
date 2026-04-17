@@ -320,7 +320,7 @@ class PathFinderTest(TestCase):
             ],
             name="tests.foo.bar_test"
         )
-        r = m.client.run(["-d", "foo.bar.che"])
+        r = m.client.run(["-v", "foo.bar.che"])
         self.assertTrue("test_che (tests.foo.bar_test.BarTest" in r)
         self.assertTrue("Ran 1 test" in r)
 
@@ -556,7 +556,7 @@ class PathGuesserTest(TestCase):
             "    def test_fail_linenumber(self):",
             "        self.fail()",
         )
-        r = m.client.run("-d", code=1)
+        r = m.client.run("-v", code=1)
         self.assertTrue(r.strip().endswith("line 6"))
 
 

@@ -518,10 +518,10 @@ class TestProgramTest(TestCase):
         r = s.run(["--verbose", "baz"], code=[0, 5])
         self.assertTrue('Ran 0 tests' in r)
 
-        r = s.run(["Bar.handshake", "--debug"])
+        r = s.run(["Bar.handshake", "--verbose"])
         self.assertTrue('bad_accept_handshake' not in r)
 
-        r = s.run(["Bar", "--debug"])
+        r = s.run(["Bar", "--verbose"])
         self.assertTrue('FooBarTest' not in r)
 
     def test_prefix_search_2(self):
@@ -684,7 +684,7 @@ class TestProgramTest(TestCase):
             "        self.assertEqual(1, 1)",
             "",
         ])
-        r = m.client.run([m.name, "-d"])
+        r = m.client.run([m.name, "-v"])
         self.assertTrue("Skipped 1/1 tests" in r)
 
         m = TestModule([
@@ -695,7 +695,7 @@ class TestProgramTest(TestCase):
             "        self.assertEqual(1, 1)",
             "",
         ])
-        r = m.client.run([m.name, "-d"])
+        r = m.client.run([m.name, "-v"])
         self.assertTrue("Skipped 1/1 tests" in r)
 
         m = TestModule([
@@ -710,7 +710,7 @@ class TestProgramTest(TestCase):
         ])
         # 1 - python <3.12
         # 5 - python >=3.12
-        r = m.client.run([m.name, "-d"], code=[1, 5])
+        r = m.client.run([m.name, "-v"], code=[1, 5])
         self.assertTrue("Failed or errored 1/1 tests" in r)
         self.assertFalse("_ErrorLoader" in r)
 
@@ -723,7 +723,7 @@ class TestProgramTest(TestCase):
             "        self.assertEqual(1, 1)",
             "",
         ])
-        r = m.client.run([m.name, "-d"], code=1)
+        r = m.client.run([m.name, "-v"], code=1)
         self.assertTrue("Failed or errored 1/1 tests" in r)
 
         m = TestModule([
@@ -732,7 +732,7 @@ class TestProgramTest(TestCase):
             "        raise ValueError()",
             "",
         ])
-        r = m.client.run([m.name, "-d"], code=1)
+        r = m.client.run([m.name, "-v"], code=1)
         self.assertTrue("Failed or errored 1/1 tests" in r)
 
         m = TestModule([
@@ -741,7 +741,7 @@ class TestProgramTest(TestCase):
             "        self.assertEqual(1, 0)",
             "",
         ])
-        r = m.client.run([m.name, "-d"], code=1)
+        r = m.client.run([m.name, "-v"], code=1)
         self.assertTrue("Failed or errored 1/1 tests" in r)
 
 

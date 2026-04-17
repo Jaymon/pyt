@@ -76,7 +76,7 @@ class TestSuite(TestSuite):
         """Get the full test paths (<MODULE>.<CLASSNAME>.<METHOD_NAME>)
         for all the tests this testsuite represents"""
         for tc in self.get_testcases():
-            if tp := testpath(test):
+            if tp := testpath(tc):
                 yield tp
 
     def run(self, result, *args, **kwargs):
@@ -461,10 +461,6 @@ class TestProgram(TestProgram):
         :keyword environ: TestEnviron, the testing environment
         :keyword testLoader: TestLoader
         :keyword testRunner: TestRunner
-        :keyword module: str, defaults to `pyt`, this should probably never
-            be messed with unless you know what you're doing because I'm not
-            even sure anymore why it is here and set to `pyt`, I know it is
-            used to get passed some parent `self.module is None` checks
         """
         self.environ = kwargs.pop("environ", TestEnviron())
 
@@ -485,6 +481,9 @@ class TestProgram(TestProgram):
         # .run method though, so the customization hook will have to be there
         kwargs.setdefault("testRunner", TestRunner)
 
+        # By default module is set to "__name__", this gets rid of that
+        kwargs.setdefault("module", None)
+
         # anything after this line will not be run because once we enter into
         # the parent's __init__ then it begins to actually compile and call all
         # the tests, it must call .runTests which can call sys.exit
@@ -496,10 +495,16 @@ class TestProgram(TestProgram):
         Loader: type[TestLoader]|None = None,
     ) -> None:
         """Ideally we would put a lot of this configuration in .parseArgs but
-        that method calls this method or ._do_discovery
-        """
+        that method calls this method or `._do_discovery`, which then calls
+        this method"""
         if self.rerun_failed_tests:
-            if self.testNames:
+            if (
+                self.testNames
+                and (
+                    len(self.testNames) > 1
+                    or self.testNames[0] != ""
+                )
+            ):
                 raise ValueError("Rerun flag passed in with tests arguments")
 
             else:
@@ -510,8 +515,8 @@ class TestProgram(TestProgram):
         # this to short circuit parent's routing to try and load tests from
         # a module. Without this being set then parent's `.createTests`
         # method will find tests using `.module`
-        if not self.testNames:
-            self.testNames = [""]
+#         if not self.testNames:
+#             self.testNames = [""]
 
         # if the --prefix flag was used on the command line then ignore the
         # environment prefixes
@@ -536,7 +541,7 @@ class TestProgram(TestProgram):
             Loader=Loader,
         )
 
-    def _getParentArgParser(self):
+    def _getParentArgParser(self) -> argparse.ArgumentParser:
         """Get the argument parser and add any custom flags
 
         .. note:: any flag you define will be set as an instance attribute
@@ -557,23 +562,23 @@ class TestProgram(TestProgram):
             ),
         )
 
-        # https://docs.python.org/2/library/warnings.html
+        # this exposes parent's warning setting to the CLI
         parser.add_argument(
             "--warnings", "--warning", "-w", "-W",
             dest="warnings",
             action="store_const",
             const="error",
-            default="",
+            default=self.warnings,
             help="Converts warnings into errors",
         )
 
-        parser.add_argument(
-            "--debug", "-d",
-            dest="verbosity",
-            action="store_const",
-            const=2,
-            help="Verbose output",
-        )
+#         parser.add_argument(
+#             "--debug", "-d",
+#             dest="verbosity",
+#             action="store_const",
+#             const=2,
+#             help="Verbose output",
+#         )
 
         parser.add_argument(
             '--rerun',
@@ -609,6 +614,19 @@ class TestProgram(TestProgram):
             help="Similar to tests positional argument but inverts the match",
         )
 
+        return parser
+
+    def _getMainArgParser(
+        self,
+        parent: argparse.ArgumentParser,
+    ) -> argparse.ArgumentParser:
+        parser = super()._getMainArgParser(parent)
+
+        # if we didn't pass in any test names then we want to find all tests
+        # which would be the empty value, we need to set the `.tests` like
+        # this to short circuit parent's routing to try and load tests from
+        # a module or to call `._do_discovery` if no tests were passed in.
+        parser.set_defaults(tests=[""])
         return parser
 
     def runTests(self):
