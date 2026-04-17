@@ -48,7 +48,7 @@ class TestSuite(TestSuite):
             depth += 1
 
         for test in self._tests:
-            if isinstance(test, type(self)):
+            if isinstance(test, TestSuite):
                 if line := test.get_method_names(depth, indent):
                     lines.append(line)
                     has_method_names = True
@@ -106,64 +106,69 @@ class TestLoader(TestLoader):
     suiteClass = TestSuite
 
     def loadTestsFromNames(self, names, *args, **kwargs):
-        ts = super().loadTestsFromNames(names, *args, **kwargs)
-        ts.program = self.program
+        test = super().loadTestsFromNames(names, *args, **kwargs)
+        test.program = self.program
 
-        test_count = ts.countTestCases()
+        test_count = test.countTestCases()
         logger.debug("Found {} total tests".format(test_count))
 
         self.program.environ.update_env_for_test(test_count)
 
-        return ts
+        return test
 
     def loadTestsFromName(self, name, *args, **kwargs):
-        ts = self.suiteClass()
+        test = self.suiteClass()
         program = self.program
         environ = program.environ
 
-        ts.program = program
-        ts.path_guesser = PathGuesser(
+        test.program = program
+        test.path_guesser = PathGuesser(
             name,
             basedir=self._top_level_dir,
             method_prefix=self.testMethodPrefix,
             prefixes=program.prefixes,
         )
-        found = False
 
         logger.debug(
-            f"Searching for tests in directory: {ts.path_guesser.basedir}"
+            f"Searching for tests in directory: {test.path_guesser.basedir}"
         )
 
-        for i, pf in enumerate(ts.path_guesser.possible, 1):
+        for i, pf in enumerate(test.path_guesser.possible, 1):
             logger.debug("{}. Searching for tests matching {}".format(i, pf))
             if pf.has_method():
                 for c, mn in pf.method_names():
                     logger.debug(
                         'Found method test: {}'.format(testpath(c, mn))
                     )
-                    found = True
-                    ts.addTest(self.loadTestsFromMethodName(c, mn))
+                    suite = self.loadTestsFromMethodName(c, mn)
+                    suite.name = f"{c.__module__}.{c.__qualname__}"
+                    test.addTest(suite)
                     environ.counter["methods"] += 1
 
             elif pf.has_class():
                 for c in pf.classes():
                     logger.debug('Found class test: {}'.format(classpath(c)))
-                    found = True
-                    ts.addTest(self.loadTestsFromTestCase(c))
+                    suite = self.loadTestsFromTestCase(c)
+                    suite.name = f"{c.__module__}.{c.__qualname__}"
+                    test.addTest(suite)
                     environ.counter["classes"] += 1
 
             else:
+                found = False
+
                 for m in pf.modules():
                     logger.debug('Found module test: {}'.format(m.__name__))
                     found = True
-                    ts.addTest(self.loadTestsFromModule(m))
+                    suite = self.loadTestsFromModule(m)
+                    suite.name = m.__name__
+                    test.addTest(suite)
                     environ.counter["modules"] += 1
 
                 # if we found a module that matched then don't try for method
                 if found:
                     break
 
-        return ts
+        return test
 
     def loadTestsFromMethodName(self, testCaseClass, method_name):
         testCaseNames = self.getTestCaseNames(testCaseClass, [method_name])
@@ -334,8 +339,6 @@ class TestRunner(TextTestRunner):
         test_cases = []
         if self.verbosity > 1:
             test_cases = list(test.get_testcases())
-#             for suite in test._tests:
-#                 test_cases.extend(suite.get_testcases())
 
         result = super().run(test)
 
@@ -618,9 +621,7 @@ class TestProgram(TestProgram):
         """
         if self.list_found_tests:
             testRunner = self.testRunner()
-            for suite in self.test._tests:
-                testRunner.stream.write(suite.get_method_names())
-
+            testRunner.stream.write(self.test.get_method_names())
             testRunner.stream.writeln("")
 
             if self.exit:

@@ -20,10 +20,10 @@ class TestEnviron(object):
         # not sure how much I love messing with the environment right here,
         # but this does propagate down to the test cases
         self.test_count = test_count
-        os.environ['PYT_TEST_COUNT'] = str(test_count)
-        os.environ['PYT_TEST_METHOD_COUNT'] = str(self.counter["methods"])
-        os.environ['PYT_TEST_CLASS_COUNT'] = str(self.counter["classes"])
-        os.environ['PYT_TEST_MODULE_COUNT'] = str(self.counter["modules"])
+        os.environ["PYT_TEST_COUNT"] = str(test_count)
+        os.environ["PYT_TEST_METHOD_COUNT"] = str(self.counter["methods"])
+        os.environ["PYT_TEST_CLASS_COUNT"] = str(self.counter["classes"])
+        os.environ["PYT_TEST_MODULE_COUNT"] = str(self.counter["modules"])
 
     def get_prefixes(self, environ_key="PYT_PREFIX"):
         """Return all the environment prefixes as a list
