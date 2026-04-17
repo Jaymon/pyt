@@ -29,22 +29,8 @@ logger = logging.getLogger(__name__)
 
 class TestSuite(TestSuite):
     """
-    We override the suite so classes that begin with an underscore will be
-    filtered out from running, this allows us to easily create base TestCase
-    instances and not worry about them being run
-
     https://github.com/python/cpython/blob/3.7/Lib/unittest/suite.py
     """
-#     def addTest(self, test):
-#         """This will filter out "private" classes that begin with an underscore
-#         """
-#         add_it = True
-#         if isinstance(test, TestCase):
-#             add_it = not test.__class__.__name__.startswith("_")
-# 
-#         if add_it:
-#             super().addTest(test)
-
     def get_method_names(self, depth=0, indent="\t"):
         """Get all the test method names this suite represents in a
         hierarchical listing
@@ -74,21 +60,21 @@ class TestSuite(TestSuite):
 
         return "\n".join(lines) if has_method_names else ""
 
-    def get_test_cases(self) -> list[TestCase]:
-        test_cases = []
+    def get_testcases(self) -> Generator[TestCase]:
+        """Get all the test cases this testsuite represents"""
         for test in self._tests:
             if isinstance(test, TestSuite):
-                test_cases.extend(test.get_test_cases())
+                yield from test.get_testcases()
 
             elif isinstance(test, TestCase):
-                test_cases.append(test)
+                yield test
 
             else:
                 logger.warning("Unknown test type: %s", type(test))
 
-        return test_cases
-
     def get_testpaths(self) -> Generator[str]:
+        """Get the full test paths (<MODULE>.<CLASSNAME>.<METHOD_NAME>)
+        for all the tests this testsuite represents"""
         for test in self._tests:
             if isinstance(test, type(self)):
                 yield from test.get_testpaths()
@@ -201,7 +187,10 @@ class TestLoader(TestLoader):
         This filters found testnames through any defined ignore patterns
 
         This will filter `testCaseClass` names that start with an underscore
-        because this treats those as private
+        because this treats those as private. So all classes that start with
+        an underscore will be filtered out from running, this allows us to
+        easily create base TestCase instances and not worry about them being
+        run
 
         :param testnames: the test methods from `testCaseClass` that should
             be filtered, if this is empty then all test names will be found
@@ -348,8 +337,9 @@ class TestRunner(TextTestRunner):
 
         test_cases = []
         if self.verbosity > 1:
-            for suite in test._tests:
-                test_cases.extend(suite.get_test_cases())
+            test_cases = list(test.get_testcases())
+#             for suite in test._tests:
+#                 test_cases.extend(suite.get_testcases())
 
         result = super().run(test)
 
@@ -501,7 +491,11 @@ class TestProgram(TestProgram):
         # the tests, it must call .runTests which can call sys.exit
         super().__init__(**kwargs)
 
-    def createTests(self, from_discovery=False, Loader=None):
+    def createTests(
+        self,
+        from_discovery: bool = False,
+        Loader: type[TestLoader]|None = None,
+    ) -> None:
         """Ideally we would put a lot of this configuration in .parseArgs but
         that method calls this method or ._do_discovery
         """
@@ -613,10 +607,7 @@ class TestProgram(TestProgram):
             action="append",
             default=[],
             metavar="TEST",
-            help=(
-                "Similar to tests positional argument but ignores"
-                " matching tests"
-            ),
+            help="Similar to tests positional argument but inverts the match",
         )
 
         return parser
