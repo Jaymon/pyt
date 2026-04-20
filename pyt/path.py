@@ -312,7 +312,10 @@ class PathFinder(object):
         seen_paths = set()
 
         for root, dirs, files in self.walk(basedir):
-            logger.debug("Checking {} for prefix {}".format(root, prefix))
+            if len(modnames) > 1:
+                # only print this if we need to check multiple parts
+                logger.debug("Checking {} for prefix {}".format(root, prefix))
+
             ret = root
             for modname in modnames:
                 for root2, dirs2, files2 in self.walk(ret):
@@ -328,16 +331,16 @@ class PathFinder(object):
                     )
                     if basename:
                         ret = os.path.join(root2, basename)
-                        logger.debug("Found prefix path {}".format(ret))
+#                         logger.debug("Found prefix path {}".format(ret))
                         break
 
                 if not ret:
-                    logger.debug(
-                        "Could not find a prefix path in {} matching {}".format(
-                            root,
-                            modname
-                        )
-                    )
+#                     logger.debug(
+#                         "Could not find a prefix path in {} matching {}".format(
+#                             root,
+#                             modname
+#                         )
+#                     )
                     break
 
             if ret:
@@ -352,10 +355,10 @@ class PathFinder(object):
         for ret in self._find_prefix_paths(basedir, prefix):
             break
 
-        if not ret:
-            raise IOError(
-                "Could not find prefix {} in path {}".format(prefix, basedir)
-            )
+#         if not ret:
+#             raise IOError(
+#                 "Could not find prefix {} in path {}".format(prefix, basedir)
+#             )
 
         return ret
 
