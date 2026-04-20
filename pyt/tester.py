@@ -571,14 +571,14 @@ class TestProgram(TestProgram):
         )
 
         parser.add_argument(
-            '--rerun',
+            "--rerun",
             dest="rerun_failed_tests",
             action="store_true",
             help="Rerun previously failed tests",
         )
 
         parser.add_argument(
-            '--prefix', "-P",
+            "--prefix", "-P",
             dest="prefixes",
             action="append",
             default=[],
@@ -589,19 +589,19 @@ class TestProgram(TestProgram):
         )
 
         parser.add_argument(
-            '--list', "-L",
+            "--list", "-L",
             dest="list_found_tests",
             action="store_true",
             help="print out found tests",
         )
 
         parser.add_argument(
-            '--not', "-n",
+            "--skip", "-S", "--not", "-n",
             dest="ignore_tests",
             action="append",
             default=[],
             metavar="TEST",
-            help="Similar to tests positional argument but inverts the match",
+            help="Invert the match and don't run those tests",
         )
 
         return parser
