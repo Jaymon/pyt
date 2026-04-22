@@ -571,7 +571,7 @@ class TestProgram(TestProgram):
         )
 
         parser.add_argument(
-            "--rerun",
+            "--rerun", "-r", "-R",
             dest="rerun_failed_tests",
             action="store_true",
             help="Rerun previously failed tests",
