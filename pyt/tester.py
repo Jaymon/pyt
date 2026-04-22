@@ -346,14 +346,26 @@ class TestRunner(TextTestRunner):
             total_count = test.countTestCases()
 
             if len(test_cases) > 1:
+#                 t_names = {}
+#                 for tc in test_cases:
+#                     class_name = tc.__class__.__qualname__
+#                     class_key = f"{tc.__class__.__module__}.{class_name}"
+#                     t_names[class_key] = [0, 0.0, class_name]
+
                 t_names = {
-                    type(tc).__name__: [0, 0.0] for tc in test_cases
+                    classpath(tc): [0, 0.0, tc.__class__.__qualname__]
+                    for tc in test_cases
                 }
                 class_type = "classes"
 
                 if len(t_names) > 30:
                     t_names = {
-                        type(tc).__module__: [0, 0.0] for tc in test_cases
+                        tc.__class__.__module__: [
+                            0,
+                            0.0,
+                            tc.__class__.__module__,
+                        ]
+                        for tc in test_cases
                     }
                     class_type = "modules"
 
@@ -369,13 +381,13 @@ class TestRunner(TextTestRunner):
                     )
 
                     for tn, duration in result.collectedDurations:
-                        for tc_name in t_names.keys():
-                            if tc_name in tn:
-                                t_names[tc_name][0] += 1
-                                t_names[tc_name][1] += duration
+                        for tc_key in t_names.keys():
+                            if tc_key in tn:
+                                t_names[tc_key][0] += 1
+                                t_names[tc_key][1] += duration
 
-                    for tc_name, tc_counts in t_names.items():
-                        tc, td = tc_counts
+                    for _, tc_info in t_names.items():
+                        tc, td, tc_name = tc_info
                         v = "tests" if tc > 1 else "test"
                         self.stream.writeln(
                             f"* {tc_name} - {tc} {v} in {td:.3f}s",
