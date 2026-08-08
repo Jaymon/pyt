@@ -1,6 +1,6 @@
 # Pyt 
 
-Pyt is a lightweight wrapper around [Python's unittest module](https://docs.python.org/3/library/unittest.html) that adds some nice features and enhancements over the stock `unittest` module.
+Pyt is a lightweight wrapper around [Python's unittest module](https://docs.python.org/3/library/unittest.html) that adds some nice features and enhancements over the stock `unittest` module. [This post goes into detail why this library exists](https://marcyes.com/2014/0309-on-software-testing/).
 
 
 ### Quickstart
